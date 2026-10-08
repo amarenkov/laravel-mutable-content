@@ -34,6 +34,11 @@
             "Amarenkov\\MutableContent\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Amarenkov\\MutableContent\\Tests\\": "tests/"
+        }
+    },
     "extra": {
         "laravel": {
             "providers": [
@@ -47,5 +52,14 @@
     "suggest": {
         "filament/filament": "For admin UI management",
         "dedoc/scramble": "For API documentation integration"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "phpunit/phpunit": "^12.0",
+        "larastan/larastan": "^3.0"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse"
     }
 }
