@@ -4,7 +4,6 @@ namespace Amarenkov\MutableContent\Models\Lov;
 
 use LogicException;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,7 +30,6 @@ use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsImmutable as CFAIsImm
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\ObjectClass as CFAObjectClass;
 
 #[Table('lov_items')]
-#[Fillable(['id', 'fields'])]
 
 #[AttributeClassLabel('LOV item')]
 

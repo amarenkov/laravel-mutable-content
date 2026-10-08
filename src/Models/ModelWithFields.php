@@ -20,7 +20,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Casts\AsArrayObject;
+
+use Amarenkov\MutableContent\Casts\AsFields;
+use Amarenkov\MutableContent\Casts\ReadOnlyArrayObject;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
@@ -51,6 +53,8 @@ class ModelWithFields extends Model
     public const COLUMN_UPDATED_WITH_COMMENT = 'updated_with_comment';
 
     public const COMMENT_MAX_LENGTH = 255;
+
+    public const FIELDS_COLUMN = 'fields';
 
     public const FIELDS_PATH_PREFIX = 'fields->';
 
@@ -259,25 +263,11 @@ class ModelWithFields extends Model
         return static::$fieldDefinitions[$cacheKey];
     }
 
-    public static function arrayMergeRecursiveDistinct(array &$array1, array &$array2)
-    {
-        $merged = $array1;
-        foreach ($array2 as $key => &$value) {
-            if (is_array($value) && isset($merged[$key]) && is_array($merged[$key])) {
-                $merged[$key] = self::arrayMergeRecursiveDistinct($merged[$key], $value);
-            } else {
-                $merged[$key] = $value;
-            }
-        }
-
-        return $merged;
-    }
-    
     // protected
     protected function casts(): array
     {
         return [
-            'fields' => AsArrayObject::class
+            self::FIELDS_COLUMN => AsFields::class
         ];
     }
 
@@ -312,6 +302,34 @@ class ModelWithFields extends Model
         }
 
         return $value;
+    }
+
+    /**
+     * Current fields as an array. Fails on a saved object loaded without the fields column.
+     */
+    protected function currentFields(): array
+    {
+        if (!array_key_exists(self::FIELDS_COLUMN, $this->attributes)) {
+            if ($this->exists) {
+                throw new LogicException('Cannot change fields of '.static::class.' object loaded without the fields column');
+            }
+
+            return [];
+        }
+
+        $fields = $this->{self::FIELDS_COLUMN};
+
+        return $fields ? $fields->getArrayCopy() : [];
+    }
+
+    protected function writeFields(array $fields)
+    {
+        return parent::setAttribute(self::FIELDS_COLUMN, new ReadOnlyArrayObject($fields, ReadOnlyArrayObject::ARRAY_AS_PROPS));
+    }
+
+    protected function isFieldsColumnKey($key): bool
+    {
+        return $key === self::FIELDS_COLUMN || str_starts_with((string)$key, self::FIELDS_PATH_PREFIX);
     }
 
     protected function forgetUpdatedBy()
@@ -382,7 +400,7 @@ class ModelWithFields extends Model
         $this->setRawAttributes($trashed->getAttributes(), true);
         $this->exists = true;
 
-        parent::setAttribute('fields', $fields);
+        $this->writeFields($fields);
 
         foreach ($updatedBy as $column => $value) {
             $this->attributes[$column] = $value;
@@ -465,20 +483,21 @@ class ModelWithFields extends Model
         return $attributes;
     }
 
+    /**
+     * Replace the given fields, keep the others. A null value removes the field.
+     */
     public function mergeWithFields($data)
     {
-        $fields = $this->fields ? $this->fields->toArray() : [];
-
-        $fields = self::arrayMergeRecursiveDistinct($fields, $data);
+        $fields = array_replace($this->currentFields(), $data);
 
         $fields = array_filter($fields, fn ($value) => $value !== null);
 
-        return parent::setAttribute('fields', $fields);
+        return $this->writeFields($fields);
     }
 
     public function setField($name, $value)
     {
-        $fields = $this->fields ?? [];
+        $fields = $this->currentFields();
 
         $value = $this->normalizeFieldValue($name, $value);
 
@@ -488,7 +507,7 @@ class ModelWithFields extends Model
             $fields[$name] = $value;
         }
 
-        return parent::setAttribute('fields', $fields);
+        return $this->writeFields($fields);
     }
 
     public function getField($name, $default = null)
@@ -571,6 +590,10 @@ class ModelWithFields extends Model
 
     public function setAttribute($key, $value)
     {
+        if ($this->isFieldsColumnKey($key)) {
+            throw new LogicException('Fields of '.static::class.' cannot be assigned directly, use setField(), fill() or mergeWithFields()');
+        }
+
         if ($this->isItField($key))
             return $this->setField($key, $value);
 
@@ -613,6 +636,18 @@ class ModelWithFields extends Model
 
     public function fill(array $attributes)
     {
+        foreach (array_keys($attributes) as $key) {
+            if ($this->isFieldsColumnKey($key)) {
+                throw new LogicException('Fields of '.static::class.' cannot be filled as a whole, pass field codes as keys');
+            }
+        }
+
+        $keyName = $this->getKeyName();
+
+        if ($this->exists && array_key_exists($keyName, $attributes) && (string)$attributes[$keyName] !== (string)$this->getKey()) {
+            throw new LogicException('Cannot change the key of saved '.static::class.' object by fill()');
+        }
+
         $not_fields = $attributes;
 
         for ($pass = 0; $pass < 2 && $not_fields; $pass++) {

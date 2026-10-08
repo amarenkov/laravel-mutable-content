@@ -2,7 +2,6 @@
 
 namespace Amarenkov\MutableContent\Models\Field;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -34,7 +33,6 @@ use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsRequired as CFAIsRequ
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsImmutableForSystemObjects as CFAIsImmutableForSystemObjects;
 
 #[Table('fields')]
-#[Fillable(['id', 'fields'])]
 
 #[AttributeClassLabel('Field')]
 

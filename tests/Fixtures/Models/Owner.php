@@ -2,7 +2,6 @@
 
 namespace Amarenkov\MutableContent\Tests\Fixtures\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
@@ -12,7 +11,6 @@ use Amarenkov\MutableContent\Attributes\Field\Common\Code as FieldCode;
 use Amarenkov\MutableContent\Attributes\Field\Common\Label as FieldLabel;
 
 #[Table('owners')]
-#[Fillable(['id', 'fields'])]
 #[ClassLabel('Owner')]
 #[FieldCode]
 #[FieldLabel]

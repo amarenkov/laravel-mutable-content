@@ -6,7 +6,6 @@ use LogicException;
 
 use ReflectionClass;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,7 +35,6 @@ use Amarenkov\MutableContent\Attributes\Field\Common\Description as CommonFieldD
 use Amarenkov\MutableContent\Attributes\Field\Common\IsSystem as CommonFieldIsSystem;
 
 #[Table('lovs')]
-#[Fillable(['id', 'fields'])]
 
 #[ClassLabel('LOV')]
 

@@ -64,7 +64,6 @@ Run the seeders in this order: lists of values first, then fields.
 A model:
 
 ```php
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
@@ -79,7 +78,6 @@ use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsRequired as CFAIsRequ
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 
 #[Table('projects.projects')]
-#[Fillable(['id', 'fields'])]
 #[ClassLabel('Project')]
 #[FieldCode]
 class Project extends ModelWithFields
@@ -168,6 +166,10 @@ the database label wins and is edited in the admin panel.
   thrown.
 - Call `setUpdatedByIfDirty()` before every `save()` (or `setUpdatedBy()` before `delete()`):
   the log trigger takes the author and comment from service columns and clears them.
+- `$model->fields` is read-only and cannot be assigned or filled as a whole: change fields with
+  `setField()`, attribute assignment, `fill()` with field codes as keys or `mergeWithFields()`.
+  Keys not declared as fields are kept by all of them. Do not load objects without the `fields`
+  column if you are going to change them.
 - Class labels in the registry must be unique.
 - Create entity tables with `Schema::createWithLog()` only: it requires all five service columns
   and fails if one is missing.

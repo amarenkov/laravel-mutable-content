@@ -134,4 +134,147 @@ class ModelWithFieldsTest extends FeatureTestCase
         $this->assertNull($record->getAttribute('fields->sync_state->missing'));
         $this->assertNull($record->getAttribute('fields->code->deeper'));
     }
+
+    public function test_fields_column_cannot_be_written_directly(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        $attempts = [
+            'fill' => fn () => $record->fill(['fields' => ['quantity' => 2]]),
+            'fill path' => fn () => $record->fill(['fields->quantity' => 2]),
+            'update' => fn () => $record->update(['fields' => []]),
+            'force fill' => fn () => $record->forceFill(['fields' => []]),
+            'create' => fn () => Record::create(['fields' => ['code' => 'REC-X']]),
+            'assign' => fn () => $record->fields = [],
+            'assign path' => fn () => $record->{'fields->quantity'} = 2,
+            'offset set' => fn () => $record->fields['quantity'] = 2,
+            'offset unset' => function () use ($record) {
+                unset($record->fields['legacy']);
+            },
+            'property set' => fn () => $record->fields->quantity = 2,
+            'exchange' => fn () => $record->fields->exchangeArray([]),
+        ];
+
+        foreach ($attempts as $name => $attempt) {
+            try {
+                $attempt();
+
+                $this->fail($name.' did not throw');
+            } catch (LogicException) {
+            }
+        }
+
+        $record->save();
+
+        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
+    }
+
+    public function test_fields_cannot_be_changed_when_not_loaded(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        $partial = Record::select('id')->find($record->id);
+
+        foreach ([
+            fn () => $partial->quantity = 5,
+            fn () => $partial->fill(['quantity' => 5]),
+            fn () => $partial->mergeWithFields(['quantity' => 5]),
+            fn () => $partial->setField('quantity', 5),
+        ] as $attempt) {
+            try {
+                $attempt();
+
+                $this->fail('Change of not loaded fields did not throw');
+            } catch (LogicException) {
+            }
+        }
+
+        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
+    }
+
+    public function test_key_of_saved_object_cannot_be_filled(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        $record->fill(['id' => (string)$record->id, 'quantity' => 2]);
+
+        $this->expectException(LogicException::class);
+
+        $record->fill(['id' => $record->id + 1]);
+    }
+
+    public function test_merge_replaces_whole_field_values(): void
+    {
+        $record = new Record();
+        $record->fill(['code' => 'REC-7', 'quantity' => 1, 'sync_state' => ['errors' => ['a', 'b', 'c'], 'step' => 2]]);
+
+        $record->fill(['sync_state' => ['errors' => ['x']]]);
+
+        $this->assertSame(['errors' => ['x']], $record->sync_state);
+    }
+
+    public function test_undeclared_fields_survive_all_operations(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        $operations = [
+            'set field' => fn (Record $record) => $record->quantity = 2,
+            'set null' => fn (Record $record) => $record->weight = null,
+            'fill' => fn (Record $record) => $record->fill(['quantity' => 3, 'weight' => null]),
+            'merge' => fn (Record $record) => $record->mergeWithFields(['quantity' => 4, 'is_active' => null]),
+            'update' => fn (Record $record) => $record->update(['quantity' => 5]),
+            'delete' => fn (Record $record) => $record->delete(),
+            'restore' => fn (Record $record) => $record->restore(),
+        ];
+
+        foreach ($operations as $name => $operation) {
+            $record = Record::withTrashed()->find($record->id);
+
+            $operation($record);
+            $record->save();
+
+            $this->assertSame('keep', $this->storedFields($record)['legacy'] ?? null, $name);
+        }
+    }
+
+    public function test_undeclared_fields_survive_restore_of_trashed_duplicate(): void
+    {
+        $owner = new Owner();
+        $owner->fill(['code' => 'OWN-2', 'label' => 'Owner Two']);
+        $owner->mergeWithFields(['legacy' => 'keep']);
+        $owner->save();
+        $owner->delete();
+
+        $again = new Owner();
+        $again->fill(['code' => 'OWN-2']);
+        $again->save();
+
+        $this->assertSame($owner->id, $again->id);
+        $this->assertSame('keep', Owner::find($owner->id)->getField('legacy'));
+    }
+
+    public function test_same_values_keep_object_clean(): void
+    {
+        $record = Record::find($this->recordWithUndeclaredField()->id);
+
+        $record->fill(['code' => 'REC-6', 'quantity' => 1]);
+        $record->mergeWithFields(['legacy' => 'keep']);
+
+        $this->assertFalse($record->isDirty());
+    }
+
+    private function recordWithUndeclaredField(): Record
+    {
+        $record = new Record();
+        $record->fill(['code' => 'REC-6', 'quantity' => 1]);
+        $record->mergeWithFields(['legacy' => 'keep']);
+        $record->save();
+
+        return $record;
+    }
+
+    private function storedFields(Record $record): array
+    {
+        return json_decode(DB::table('fixtures.records')->where('id', $record->id)->value('fields'), true);
+    }
 }

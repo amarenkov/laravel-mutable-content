@@ -7,6 +7,21 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `fields` column is read-only from outside: `$model->fields` is a read-only array object, and assigning `fields` or a `fields->...` path, or passing them to `fill()`, `update()` or `create()`, throws a `LogicException`. Change fields with `setField()`, attribute assignment, `fill()` with field codes as keys or `mergeWithFields()`.
+- `fill()` and `mergeWithFields()` replace whole field values instead of merging nested arrays recursively, so lists and nested keys can be replaced and removed.
+- `fill()` throws a `LogicException` when it would change the key of a saved object.
+- Package models no longer declare `id` and `fields` as fillable.
+
+### Removed
+
+- `ModelWithFields::arrayMergeRecursiveDistinct()`.
+
+### Fixed
+
+- Changing fields of an object loaded without the `fields` column throws a `LogicException` instead of overwriting the stored fields.
+
 ## [0.2.0] - 2026-10-08
 
 ### Added

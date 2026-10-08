@@ -2,7 +2,6 @@
 
 namespace Amarenkov\MutableContent\Models\Field;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,7 +34,6 @@ use Amarenkov\MutableContent\Attributes\FieldAttr\Common\ObjectClass as CFAObjec
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsImmutableForSystemObjects as CFAIsImmutableForSystemObjects;
 
 #[Table('fields_usage')]
-#[Fillable(['id', 'fields'])]
 
 #[AttributeClassLabel('Field usage')]
 
