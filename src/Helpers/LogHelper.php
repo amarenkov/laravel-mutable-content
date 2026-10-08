@@ -22,6 +22,7 @@ use Amarenkov\MutableContent\Models\ModelWithFields;
 class LogHelper
 {
     // const
+    public const COLUMN_ID = 'id';
     public const COLUMN_ENTITY_ID = 'entity_id';
     public const COLUMN_FIELDS_OLD = 'fields_old';
     public const COLUMN_FIELDS_NEW = 'fields_new';
@@ -31,6 +32,7 @@ class LogHelper
     public const COLUMN_COMMENT = 'comment';
 
     public const COLUMN_OBJECT_CLASS = 'object_class';
+    public const COLUMN_LOG_ID = 'log_id';
 
     public const ACTION_CREATED = 'created';
     public const ACTION_UPDATED = 'updated';
@@ -64,6 +66,7 @@ class LogHelper
     {
         return DB::table(static::getLogsTable($class))
             ->select([
+                self::COLUMN_ID.' as '.self::COLUMN_LOG_ID,
                 self::COLUMN_ENTITY_ID,
                 self::COLUMN_FIELDS_OLD,
                 self::COLUMN_FIELDS_NEW,

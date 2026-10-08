@@ -72,7 +72,7 @@ class MutableContentServiceProvider extends ServiceProvider
     {
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
-        ]);
+        ], 'mutable-content-migrations');
 
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'mutable-content');
         $this->loadJsonTranslationsFrom(__DIR__.'/../lang');

@@ -26,7 +26,7 @@ class Entry extends Model
         $numbered = $logQuery->newQuery()
             ->fromSub($logQuery, 'log_entries')
             ->select('log_entries.*')
-            ->selectRaw('row_number() over (order by '.LogHelper::COLUMN_DATE.' desc, '.LogHelper::COLUMN_OBJECT_CLASS.', '.LogHelper::COLUMN_ENTITY_ID.' desc) as id');
+            ->selectRaw('row_number() over (order by '.LogHelper::COLUMN_DATE.' desc, '.LogHelper::COLUMN_OBJECT_CLASS.', '.LogHelper::COLUMN_LOG_ID.' desc) as id');
 
         $model = new static();
 

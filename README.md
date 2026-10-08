@@ -50,7 +50,7 @@ and it shows up in forms, tables, validation and API docs.
 ```bash
 composer require amarenkov/laravel-mutable-content
 
-php artisan vendor:publish --provider="Amarenkov\MutableContent\MutableContentServiceProvider"
+php artisan vendor:publish --tag=mutable-content-migrations
 php artisan migrate
 
 php artisan db:seed --class="Amarenkov\MutableContent\Database\Seeders\LovsSeeder"

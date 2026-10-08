@@ -122,7 +122,7 @@ class Builder
     }
 
     /**
-     * Rename schema indexes and sequences by name prefix: old prefix => new. The first matching prefix wins.
+     * Rename schema indexes and sequences by exact name or name prefix: old => new. The first match wins.
      *
      * @param array<string, string> $prefixes
      */
@@ -135,7 +135,7 @@ class Builder
 
         foreach ($relations as $relation) {
             foreach ($prefixes as $old => $new) {
-                if (!str_starts_with($relation->relname, $old.'_')) {
+                if ($relation->relname !== $old && !str_starts_with($relation->relname, $old.'_')) {
                     continue;
                 }
 
@@ -192,6 +192,8 @@ class Builder
             
             $blueprint = tap($this->createBlueprint($logsTable), function ($blueprint) {
                 $blueprint->create();
+
+                $blueprint->bigIncrements('id');
 
                 $blueprint->unsignedInteger('entity_id');
                 
@@ -255,8 +257,13 @@ class Builder
                 str_replace('.', '_', $from) => str_replace('.', '_', $to),
                 $fromName => $toName,
             ]);
+            $fromLogsName = explode('.', $fromLogsTable, 2)[1];
+            $toLogsName = explode('.', $toLogsTable, 2)[1];
+
             Builder::renameRelationsByPrefix($connection, 'logs', [
                 str_replace('.', '_', $fromLogsTable) => str_replace('.', '_', $toLogsTable),
+                $fromLogsName.'_id_seq' => $toLogsName.'_id_seq',
+                $fromLogsName.'_pkey' => $toLogsName.'_pkey',
             ]);
 
             Builder::createLogTriggers($connection, $to);

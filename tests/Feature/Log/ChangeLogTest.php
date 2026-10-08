@@ -19,7 +19,7 @@ class ChangeLogTest extends FeatureTestCase
 {
     protected function logRows(string $table, int $id): array
     {
-        return DB::table($table)->where('entity_id', $id)->orderByRaw('ctid')->get()->map(fn ($row) => [
+        return DB::table($table)->where('entity_id', $id)->orderBy('id')->get()->map(fn ($row) => [
             'old' => json_decode((string)$row->fields_old, true),
             'new' => json_decode((string)$row->fields_new, true),
             'is_deleted' => $row->is_deleted,
@@ -134,6 +134,13 @@ class ChangeLogTest extends FeatureTestCase
         DB::table('fixtures.archived_records')->update(['fields' => json_encode(['code' => 'REC-1', 'quantity' => 5])]);
 
         $this->assertSame(2, DB::table('logs.fixtures_archived_records')->count());
+
+        $relations = DB::table('pg_class')->join('pg_namespace', 'pg_namespace.oid', '=', 'pg_class.relnamespace')
+            ->where('pg_namespace.nspname', 'logs')->where('pg_class.relname', 'like', 'fixtures_%records%')->pluck('relname')->all();
+
+        $this->assertContains('fixtures_archived_records_id_seq', $relations);
+        $this->assertContains('fixtures_archived_records_pkey', $relations);
+        $this->assertNotContains('fixtures_records_id_seq', $relations);
     }
 
     public function test_create_with_log_requires_service_columns(): void
@@ -145,5 +152,36 @@ class ChangeLogTest extends FeatureTestCase
             $table->fieldsBase();
             $table->fieldsUpdatedAt();
         });
+    }
+
+    public function test_entries_of_one_transaction_keep_their_order(): void
+    {
+        $record = $this->makeRecord();
+
+        foreach ([2, 3, 4] as $quantity) {
+            $record->quantity = $quantity;
+            $record->save();
+        }
+
+        $descriptions = Entry::fromQuery(LogHelper::query(Record::class)->where('entity_id', $record->id))
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Entry $entry) => $entry->describe())
+            ->all();
+
+        $this->assertSame([['Quantity: 3 → 4'], ['Quantity: 2 → 3'], ['Quantity: 1 → 2'], ['Code: REC-1', 'Quantity: 1']], $descriptions);
+    }
+
+    public function test_upgrade_migration_adds_id_to_old_log_tables(): void
+    {
+        DB::statement('CREATE TABLE logs.legacy (entity_id integer, comment varchar(255))');
+        DB::table('logs.legacy')->insert([['entity_id' => 1, 'comment' => 'first'], ['entity_id' => 1, 'comment' => 'second']]);
+
+        $migration = require __DIR__.'/../../../database/migrations/2026_10_09_000000_add_id_to_log_tables.php';
+        $migration->up();
+        $migration->up();
+
+        $this->assertSame(['first', 'second'], DB::table('logs.legacy')->orderBy('id')->pluck('comment')->all());
+        $this->assertSame(3, DB::table('logs.legacy')->insertGetId(['entity_id' => 1, 'comment' => 'third']));
     }
 }
