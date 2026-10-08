@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
 ### Changed
 
 - The `fields` column is read-only from outside: `$model->fields` is a read-only array object, and assigning `fields` or a `fields->...` path, or passing them to `fill()`, `update()` or `create()`, throws a `LogicException`. Change fields with `setField()`, attribute assignment, `fill()` with field codes as keys or `mergeWithFields()`.
@@ -42,6 +44,7 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/amarenkov/laravel-mutable-content/releases/tag/v0.1.0
