@@ -24,7 +24,7 @@ and it shows up in forms, tables, validation and API docs.
   The display unit is a per-field setting.
 - **Lists of values (LOV).** Also two-sourced: system lists are described by classes with
   attributes, user items are added in the admin panel on top of the system ones.
-- **Transparent access.** `$order->code` reads the value from `jsonb` as if it were a regular
+- **Transparent access.** `$project->code` reads the value from `jsonb` as if it were a regular
   column: `getAttribute`, `setAttribute` and `fill` are intercepted.
 - **Indexable `jsonb` fields.** The `fieldExtract()` macro creates a generated column
   `GENERATED ALWAYS AS ((fields ->> 'code')::type) STORED` for indexes, unique constraints and
@@ -75,11 +75,11 @@ use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsRequired as CFAIsRequ
 
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 
-#[Table('orders.orders')]
+#[Table('projects.projects')]
 #[Fillable(['id', 'fields'])]
-#[ClassLabel('Order')]
+#[ClassLabel('Project')]
 #[FieldCode]
-class Order extends ModelWithFields
+class Project extends ModelWithFields
 {
     #[CFAType(FieldType::TYPE_INT), CFALabel('Priority'), CFAIsRequired]
     const FIELD_PRIORITY = 'priority';
@@ -92,15 +92,15 @@ class Order extends ModelWithFields
 Register it in your service provider:
 
 ```php
-$this->app->make(MutableClassRegistry::class)->add(Order::class);
+$this->app->make(MutableClassRegistry::class)->add(Project::class);
 ```
 
 A migration:
 
 ```php
-Schema::createSchema('orders');
+Schema::createSchema('projects');
 
-Schema::createWithLog('orders.orders', function (Blueprint $table) {
+Schema::createWithLog('projects.projects', function (Blueprint $table) {
     $table->fieldsBase();        // id, jsonb fields, created_at
     $table->fieldsUpdatedAt();   // updated_at
     $table->softDeletes();       // deleted_at
@@ -114,12 +114,12 @@ Schema::createWithLog('orders.orders', function (Blueprint $table) {
 Usage:
 
 ```php
-$order = new Order();
-$order->mergeWithFields(['code' => 'ORD-1', 'priority' => 10]);
-$order->setUpdatedByIfDirty('import', $user->id); // goes to the change log
-$order->save();
+$project = new Project();
+$project->mergeWithFields(['code' => 'PRJ-1', 'priority' => 10]);
+$project->setUpdatedByIfDirty('import', $user->id); // goes to the change log
+$project->save();
 
-$order->priority; // 10, read from jsonb like a regular attribute
+$project->priority; // 10, read from jsonb like a regular attribute
 ```
 
 Validation rules are built from the same definition:
@@ -128,9 +128,9 @@ Validation rules are built from the same definition:
 use Amarenkov\MutableContent\Helpers\RuleHelper;
 
 $request->validate(
-    RuleHelper::getValidationRules(Order::class) +
-    ['items' => 'array|required'] +
-    RuleHelper::getValidationRules(OrderItem::class, 'items.*')
+    RuleHelper::getValidationRules(Project::class) +
+    ['tasks' => 'array|required'] +
+    RuleHelper::getValidationRules(Task::class, 'tasks.*')
 );
 ```
 
@@ -140,9 +140,9 @@ code, like an unlisted LOV item (rule `ObjectCode`). Type settings are set in th
 in code with the `TypeSettings` attribute:
 
 ```php
-#[CFAType(Type::TYPE_OBJECT), CFAObjectClass(Operation::class),
+#[CFAType(Type::TYPE_OBJECT), CFAObjectClass(Team::class),
   CFATypeSettings([TypeSettings::LINK_BY_CODE => true, TypeSettings::ALLOW_UNLISTED_CODES => true])]
-const FIELD_OPERATION_CODE = 'operation_code';
+const FIELD_TEAM_CODE = 'team_code';
 ```
 
 ## Translations
