@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
 ### Added
 
 - `mutable-content-migrations` publish tag for the package migrations.
@@ -25,5 +27,6 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/amarenkov/laravel-mutable-content/releases/tag/v0.1.0
