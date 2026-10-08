@@ -40,7 +40,7 @@ class TypeSettings
     /**
      * Type settings and their allowed values.
      *
-     * @return array<string, array<string>>
+     * @return array<string, array<string|bool>>
      */
     public static function getAllowedValues(string $fieldType): array
     {
