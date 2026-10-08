@@ -1,0 +1,51 @@
+{
+    "name": "amarenkov/laravel-mutable-content",
+    "description": "Flexible content models for Laravel: dynamic JSONB fields with a type system, change log and lists of values (LOV).",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "eloquent",
+        "jsonb",
+        "postgresql",
+        "dynamic-fields",
+        "custom-fields",
+        "lov",
+        "audit-log"
+    ],
+    "homepage": "https://github.com/amarenkov/laravel-mutable-content",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Alexey Marenkov",
+            "email": "alex@marenkov.dev",
+            "homepage": "https://github.com/amarenkov"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/amarenkov/laravel-mutable-content/issues",
+        "source": "https://github.com/amarenkov/laravel-mutable-content"
+    },
+    "require": {
+        "php": "^8.4",
+        "laravel/framework": "^13.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Amarenkov\\MutableContent\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Amarenkov\\MutableContent\\MutableContentServiceProvider"
+            ]
+        },
+        "branch-alias": {
+            "dev-master": "0.1.x-dev"
+        }
+    },
+    "suggest": {
+        "filament/filament": "For admin UI management",
+        "dedoc/scramble": "For API documentation integration"
+    }
+}
