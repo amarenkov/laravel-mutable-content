@@ -111,4 +111,27 @@ class ModelWithFieldsTest extends FeatureTestCase
     {
         $this->assertSame(['code' => 20], Owner::getFieldMaxLengths());
     }
+
+    public function test_helpers_work_without_code_and_label_fields(): void
+    {
+        $record = new Record();
+        $record->fill(['quantity' => 1]);
+
+        $this->assertSame('', $record->label());
+        $this->assertNull($record->label);
+        $this->assertSame('', $record->code());
+        $this->assertFalse($record->isSystem());
+    }
+
+    public function test_fields_path_attribute(): void
+    {
+        $record = new Record();
+        $record->fill(['code' => 'REC-5', 'quantity' => 1, 'sync_state' => ['step' => 2, 'source' => ['name' => 'api']]]);
+
+        $this->assertSame('REC-5', $record->getAttribute('fields->code'));
+        $this->assertSame(2, $record->getAttribute('fields->sync_state->step'));
+        $this->assertSame('api', $record->getAttribute('fields->sync_state->source->name'));
+        $this->assertNull($record->getAttribute('fields->sync_state->missing'));
+        $this->assertNull($record->getAttribute('fields->code->deeper'));
+    }
 }

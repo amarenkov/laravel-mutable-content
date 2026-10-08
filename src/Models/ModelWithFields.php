@@ -2,6 +2,7 @@
 
 namespace Amarenkov\MutableContent\Models;
 
+use ArrayAccess;
 use DateTimeInterface;
 use LogicException;
 use Throwable;
@@ -50,6 +51,8 @@ class ModelWithFields extends Model
     public const COLUMN_UPDATED_WITH_COMMENT = 'updated_with_comment';
 
     public const COMMENT_MAX_LENGTH = 255;
+
+    public const FIELDS_PATH_PREFIX = 'fields->';
 
     // static
     protected static array|bool|null $fieldDefinitions = false;
@@ -532,10 +535,38 @@ class ModelWithFields extends Model
 
     public function getAttribute($key)
     {
+        if (str_starts_with((string)$key, self::FIELDS_PATH_PREFIX)) {
+            return $this->getFieldByPath(substr($key, strlen(self::FIELDS_PATH_PREFIX)));
+        }
+
         if ($this->isItField($key))
             return $this->getField($key);
 
         return parent::getAttribute($key);
+    }
+
+    public function getFieldByPath(string $path, $default = null)
+    {
+        $value = $this->fields;
+
+        foreach (explode('->', $path) as $segment) {
+            if (!($value instanceof ArrayAccess || is_array($value)) || !isset($value[$segment])) {
+                return $default;
+            }
+
+            $value = $value[$segment];
+        }
+
+        return $value;
+    }
+
+    public function isRelation($key)
+    {
+        if (in_array($key, [Field::COMMON_CODE_CODE, Field::COMMON_CODE_LABEL], true)) {
+            return false;
+        }
+
+        return parent::isRelation($key);
     }
 
     public function setAttribute($key, $value)
@@ -610,16 +641,16 @@ class ModelWithFields extends Model
 
     public function isSystem()
     {
-        return (bool)$this->{Field::COMMON_CODE_IS_SYSTEM};
+        return (bool)$this->getField(Field::COMMON_CODE_IS_SYSTEM);
     }
 
     public function code()
     {
-        return (string)$this->{Field::COMMON_CODE_CODE};
+        return (string)$this->getField(Field::COMMON_CODE_CODE);
     }
 
     public function label()
     {
-        return (string)$this->{Field::COMMON_CODE_LABEL};
+        return (string)$this->getField(Field::COMMON_CODE_LABEL);
     }
 }
