@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 
 use Illuminate\Database\Eloquent\Casts\Json;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 use Illuminate\Database\Eloquent\Model;
@@ -330,6 +331,74 @@ class ModelWithFields extends Model
     protected function isFieldsColumnKey($key): bool
     {
         return $key === self::FIELDS_COLUMN || str_starts_with((string)$key, self::FIELDS_PATH_PREFIX);
+    }
+
+    protected function getDirtyForUpdate()
+    {
+        $dirty = parent::getDirtyForUpdate();
+
+        if (array_key_exists(self::FIELDS_COLUMN, $dirty)) {
+            $expression = $this->fieldsUpdateExpression();
+
+            if ($expression === false) {
+                unset($dirty[self::FIELDS_COLUMN]);
+            } elseif ($expression !== null) {
+                $dirty[self::FIELDS_COLUMN] = $expression;
+            }
+        }
+
+        return $dirty;
+    }
+
+    /**
+     * Update of the changed fields only, so keys written by others meanwhile are kept.
+     * False if no field changed, null to write the whole column.
+     */
+    protected function fieldsUpdateExpression(): Expression|false|null
+    {
+        $original = $this->original[self::FIELDS_COLUMN] ?? null;
+        $current = $this->attributes[self::FIELDS_COLUMN] ?? null;
+
+        $old = $original === null ? [] : Json::decode($original);
+        $new = $current === null ? null : Json::decode($current);
+
+        if (!is_array($old) || !is_array($new)) {
+            return null;
+        }
+
+        $changed = [];
+
+        foreach ($new as $key => $value) {
+            if (!array_key_exists($key, $old) || $old[$key] !== $value) {
+                $changed[$key] = $value;
+            }
+        }
+
+        $removed = array_keys(array_diff_key($old, $new));
+
+        if (!$changed && !$removed) {
+            return false;
+        }
+
+        $connection = $this->getConnection();
+
+        if ($connection->getDriverName() !== 'pgsql') {
+            return null;
+        }
+
+        $column = $connection->getQueryGrammar()->wrap(self::FIELDS_COLUMN);
+
+        $sql = 'case when jsonb_typeof('.$column.") = 'object' then ".$column." else '{}'::jsonb end";
+
+        if ($removed) {
+            $sql = '('.$sql.' - array['.implode(', ', array_map(fn ($key) => $connection->escape((string)$key), $removed)).']::text[])';
+        }
+
+        if ($changed) {
+            $sql .= ' || '.$connection->escape($this->asJson((object)$changed)).'::jsonb';
+        }
+
+        return new Expression($sql);
     }
 
     protected function forgetUpdatedBy()

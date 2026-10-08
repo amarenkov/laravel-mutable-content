@@ -170,6 +170,8 @@ the database label wins and is edited in the admin panel.
   `setField()`, attribute assignment, `fill()` with field codes as keys or `mergeWithFields()`.
   Keys not declared as fields are kept by all of them. Do not load objects without the `fields`
   column if you are going to change them.
+- Saving writes only the changed fields, so concurrent saves of different fields do not overwrite
+  each other. Concurrent changes of the same field: the last save wins.
 - Class labels in the registry must be unique.
 - Create entity tables with `Schema::createWithLog()` only: it requires all five service columns
   and fails if one is missing.

@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Saving a model writes only the changed fields on PostgreSQL (`fields - removed || changed`), so fields written by another process between loading and saving the model are kept.
+
 ## [0.3.0] - 2026-10-08
 
 ### Changed

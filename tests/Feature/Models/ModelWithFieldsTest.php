@@ -263,6 +263,65 @@ class ModelWithFieldsTest extends FeatureTestCase
         $this->assertFalse($record->isDirty());
     }
 
+    public function test_save_keeps_fields_written_meanwhile(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+        $record->fill(['weight' => 3]);
+        $record->save();
+
+        $stale = Record::find($record->id);
+
+        $other = Record::find($record->id);
+        $other->fill(['is_active' => true]);
+        $other->save();
+
+        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => DB::raw("fields || '{\"external\": \"sync\"}'::jsonb")]);
+
+        $stale->fill(['quantity' => 7, 'weight' => null]);
+        $stale->save();
+
+        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 7, 'is_active' => true], $this->storedFields($record));
+    }
+
+    public function test_save_writes_only_changed_fields_to_log(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => DB::raw("fields || '{\"external\": \"sync\"}'::jsonb")]);
+
+        $record->quantity = 2;
+        $record->setUpdatedByIfDirty('manual', 8);
+        $record->save();
+
+        $row = DB::table('logs.fixtures_records')->where('entity_id', $record->id)->orderByDesc('id')->first();
+
+        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 2], json_decode($row->fields_new, true));
+        $this->assertSame('manual', $row->comment);
+    }
+
+    public function test_save_over_non_object_fields(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => '[]']);
+
+        $empty = Record::find($record->id);
+        $empty->fill(['code' => 'REC-8', 'quantity' => 1]);
+        $empty->save();
+
+        $this->assertSame(['code' => 'REC-8', 'quantity' => 1], $this->storedFields($record));
+    }
+
+    public function test_numeric_keys_are_saved_as_object_keys(): void
+    {
+        $record = $this->recordWithUndeclaredField();
+
+        $record->mergeWithFields(['0' => 'zero']);
+        $record->save();
+
+        $this->assertSame('zero', $this->storedFields($record)['0'] ?? null);
+    }
+
     private function recordWithUndeclaredField(): Record
     {
         $record = new Record();
