@@ -9,7 +9,7 @@ use Illuminate\Queue\Events\JobProcessing;
 
 use Amarenkov\MutableContent\Macros\Database\Schema\Blueprint as DatabaseSchemaBlueprintMacros;
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as DatabaseSchemaBuilderMacros;
-use Amarenkov\MutableContent\Macros\Database\Schema\Grammars\PostgresGrammar as DatabaseSchemaPostgresGrammarMacros;
+use Amarenkov\MutableContent\Macros\Database\Schema\Grammars\Grammar as DatabaseSchemaGrammarMacros;
 use Amarenkov\MutableContent\Macros\Support\Str as SupportStrMacros;
 
 use Amarenkov\MutableContent\Domain\MutableClassRegistry;
@@ -90,6 +90,6 @@ class MutableContentServiceProvider extends ServiceProvider
 
         DatabaseSchemaBlueprintMacros::add();
         DatabaseSchemaBuilderMacros::add();
-        DatabaseSchemaPostgresGrammarMacros::add();
+        DatabaseSchemaGrammarMacros::add();
     }
 }

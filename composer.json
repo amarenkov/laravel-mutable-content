@@ -1,12 +1,13 @@
 {
     "name": "amarenkov/laravel-mutable-content",
-    "description": "Flexible content models for Laravel: dynamic JSONB fields with a type system, change log and lists of values (LOV).",
+    "description": "Flexible content models for Laravel: dynamic JSON fields with a type system, change log and lists of values (LOV).",
     "type": "library",
     "keywords": [
         "laravel",
         "eloquent",
         "jsonb",
         "postgresql",
+        "mariadb",
         "dynamic-fields",
         "custom-fields",
         "lov",

@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 use Amarenkov\MutableContent\Database\Seeders\FieldsSeeder;
 use Amarenkov\MutableContent\Database\Seeders\LovsSeeder;
+use Amarenkov\MutableContent\Helpers\DatabaseHelper;
+use Amarenkov\MutableContent\Helpers\LogHelper;
 use Amarenkov\MutableContent\Models\ModelWithFields;
 use Amarenkov\MutableContent\MutableContentServiceProvider;
 
@@ -31,7 +33,7 @@ abstract class FeatureTestCase extends TestCase
     {
         parent::defineEnvironment($app);
 
-        $app['config']->set('database.default', 'pgsql');
+        $app['config']->set('database.default', env('DB_CONNECTION', 'pgsql'));
     }
 
     protected function setUp(): void
@@ -54,11 +56,17 @@ abstract class FeatureTestCase extends TestCase
 
     protected function prepareDatabase(): void
     {
-        foreach (['public', 'logs', 'fixtures'] as $schema) {
-            DB::statement("DROP SCHEMA IF EXISTS {$schema} CASCADE");
-        }
+        if (DatabaseHelper::isMariaDb()) {
+            foreach (DB::connection()->getSchemaBuilder()->getTableListing(schemaQualified: false) as $table) {
+                DB::statement('DROP TABLE IF EXISTS `'.$table.'`');
+            }
+        } else {
+            foreach (['public', 'logs', 'fixtures'] as $schema) {
+                DB::statement("DROP SCHEMA IF EXISTS {$schema} CASCADE");
+            }
 
-        DB::statement('CREATE SCHEMA public');
+            DB::statement('CREATE SCHEMA public');
+        }
 
         Artisan::call('migrate', [
             '--path' => [
@@ -72,5 +80,35 @@ abstract class FeatureTestCase extends TestCase
         $this->seed(FieldsSeeder::class);
 
         ModelWithFields::flushFieldDefinitions();
+    }
+
+    /**
+     * Rebuild the database before the next test: DDL commits the test transaction on MariaDB.
+     */
+    protected function rebuildDatabaseAfterTest(): void
+    {
+        if (DatabaseHelper::isMariaDb()) {
+            static::$databaseReady = false;
+        }
+    }
+
+    protected function tableOf(string $class): string
+    {
+        return new $class()->getTable();
+    }
+
+    protected function logsTableOf(string $class): string
+    {
+        return LogHelper::getLogsTable($class);
+    }
+
+    /**
+     * SQL expression adding a string key to the fields column.
+     */
+    protected function fieldsWithKey(string $key, string $value): mixed
+    {
+        return DatabaseHelper::isMariaDb()
+            ? DB::raw("json_set(fields, '$.\"{$key}\"', '{$value}')")
+            : DB::raw("fields || jsonb_build_object('{$key}', '{$value}')");
     }
 }

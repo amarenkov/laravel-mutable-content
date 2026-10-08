@@ -75,7 +75,7 @@ class LogHelper
                 self::COLUMN_USER_ID,
                 self::COLUMN_COMMENT,
             ])
-            ->selectRaw('?::text as '.self::COLUMN_OBJECT_CLASS, [$class]);
+            ->selectRaw((DatabaseHelper::isMariaDb() ? 'cast(? as char)' : '?::text').' as '.self::COLUMN_OBJECT_CLASS, [$class]);
     }
 
     /**

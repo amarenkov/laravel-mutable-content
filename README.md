@@ -4,7 +4,7 @@
 [![Packagist](https://img.shields.io/packagist/v/amarenkov/laravel-mutable-content)](https://packagist.org/packages/amarenkov/laravel-mutable-content)
 
 Laravel models whose set of fields is not fixed by the database schema. Values live in a single
-`jsonb` column, and field definitions come from two sources: PHP attributes in code and records
+JSON column (`jsonb` on PostgreSQL), and field definitions come from two sources: PHP attributes in code and records
 in reference tables that an administrator edits by hand.
 
 One field definition feeds everything at once: Eloquent, validation rules, the admin panel
@@ -27,13 +27,12 @@ and it shows up in forms, tables, validation and API docs.
   The display unit is a per-field setting.
 - **Lists of values (LOV).** Also two-sourced: system lists are described by classes with
   attributes, user items are added in the admin panel on top of the system ones.
-- **Transparent access.** `$project->code` reads the value from `jsonb` as if it were a regular
+- **Transparent access.** `$project->code` reads the value from JSON as if it were a regular
   column: `getAttribute`, `setAttribute` and `fill` are intercepted.
-- **Indexable `jsonb` fields.** The `fieldExtract()` macro creates a generated column
-  `GENERATED ALWAYS AS ((fields ->> 'code')::type) STORED` for indexes, unique constraints and
-  Eloquent relations.
+- **Indexable JSON fields.** The `fieldExtract()` macro creates a stored generated column from a
+  field for indexes, unique constraints and Eloquent relations.
 - **Change log out of the box.** `Schema::createWithLog()` creates a log table in the `logs`
-  schema and triggers that record the old and new state of a row with its author and comment.
+  schema (a `logs__` table prefix on MariaDB) and triggers that record the old and new state of a row with its author and comment.
   `LogHelper` and `Models\Log\Entry` read the log back in a human-readable form.
 - **References by code.** An `object` field can store an object code instead of its id
   (`link_by_code`), optionally accepting codes that do not exist yet (`allow_unlisted_codes`).
@@ -42,8 +41,12 @@ and it shows up in forms, tables, validation and API docs.
 
 - PHP 8.4
 - Laravel 13
-- PostgreSQL. The package relies on `jsonb`, generated columns, statement-level triggers and
-  schemas. MySQL support is planned.
+- PostgreSQL or MariaDB 10.7+ (connection driver `mariadb`). MySQL is not supported.
+
+On MariaDB a table name with a schema, such as `projects.projects`, becomes
+`projects__projects` in one database: models, `Schema::createWithLog()` and `LogHelper` translate
+it, so the same models and migrations work on both. `Schema::createSchema()` does nothing there.
+Use the model's `getTable()` instead of a literal name with a schema in raw queries.
 
 ## Installation
 
@@ -102,7 +105,7 @@ A migration:
 Schema::createSchema('projects');
 
 Schema::createWithLog('projects.projects', function (Blueprint $table) {
-    $table->fieldsBase();        // id, jsonb fields, created_at
+    $table->fieldsBase();        // id, JSON fields, created_at
     $table->fieldsUpdatedAt();   // updated_at
     $table->softDeletes();       // deleted_at
     $table->fieldsUpdatedBy();   // updated_by_user_id, updated_with_comment
@@ -120,7 +123,7 @@ $project->mergeWithFields(['code' => 'PRJ-1', 'priority' => 10]);
 $project->setUpdatedByIfDirty('import', $user->id); // goes to the change log
 $project->save();
 
-$project->priority; // 10, read from jsonb like a regular attribute
+$project->priority; // 10, read from JSON like a regular attribute
 ```
 
 Validation rules are built from the same definition:

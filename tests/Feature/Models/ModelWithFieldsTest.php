@@ -23,8 +23,8 @@ class ModelWithFieldsTest extends FeatureTestCase
         $record->quantity = 10;
         $record->save();
 
-        $this->assertSame(['code' => 'REC-1', 'quantity' => 10], json_decode(DB::table('fixtures.records')->where('id', $record->id)->value('fields'), true));
-        $this->assertSame('REC-1', DB::table('fixtures.records')->where('id', $record->id)->value('code'));
+        $this->assertSame(['code' => 'REC-1', 'quantity' => 10], json_decode(DB::table($this->tableOf(Record::class))->where('id', $record->id)->value('fields'), true));
+        $this->assertSame('REC-1', DB::table($this->tableOf(Record::class))->where('id', $record->id)->value('code'));
 
         $fresh = Record::find($record->id);
 
@@ -166,7 +166,7 @@ class ModelWithFieldsTest extends FeatureTestCase
 
         $record->save();
 
-        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
+        $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
     }
 
     public function test_fields_cannot_be_changed_when_not_loaded(): void
@@ -189,7 +189,7 @@ class ModelWithFieldsTest extends FeatureTestCase
             }
         }
 
-        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
+        $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
     }
 
     public function test_key_of_saved_object_cannot_be_filled(): void
@@ -275,27 +275,27 @@ class ModelWithFieldsTest extends FeatureTestCase
         $other->fill(['is_active' => true]);
         $other->save();
 
-        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => DB::raw("fields || '{\"external\": \"sync\"}'::jsonb")]);
+        DB::table($this->tableOf(Record::class))->where('id', $record->id)->update(['fields' => $this->fieldsWithKey('external', 'sync')]);
 
         $stale->fill(['quantity' => 7, 'weight' => null]);
         $stale->save();
 
-        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 7, 'is_active' => true], $this->storedFields($record));
+        $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 7, 'is_active' => true], $this->storedFields($record));
     }
 
     public function test_save_writes_only_changed_fields_to_log(): void
     {
         $record = $this->recordWithUndeclaredField();
 
-        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => DB::raw("fields || '{\"external\": \"sync\"}'::jsonb")]);
+        DB::table($this->tableOf(Record::class))->where('id', $record->id)->update(['fields' => $this->fieldsWithKey('external', 'sync')]);
 
         $record->quantity = 2;
         $record->setUpdatedByIfDirty('manual', 8);
         $record->save();
 
-        $row = DB::table('logs.fixtures_records')->where('entity_id', $record->id)->orderByDesc('id')->first();
+        $row = DB::table($this->logsTableOf(Record::class))->where('entity_id', $record->id)->orderByDesc('id')->first();
 
-        $this->assertSame(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 2], json_decode($row->fields_new, true));
+        $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 2], json_decode($row->fields_new, true));
         $this->assertSame('manual', $row->comment);
     }
 
@@ -303,13 +303,13 @@ class ModelWithFieldsTest extends FeatureTestCase
     {
         $record = $this->recordWithUndeclaredField();
 
-        DB::table('fixtures.records')->where('id', $record->id)->update(['fields' => '[]']);
+        DB::table($this->tableOf(Record::class))->where('id', $record->id)->update(['fields' => '[]']);
 
         $empty = Record::find($record->id);
         $empty->fill(['code' => 'REC-8', 'quantity' => 1]);
         $empty->save();
 
-        $this->assertSame(['code' => 'REC-8', 'quantity' => 1], $this->storedFields($record));
+        $this->assertSameFields(['code' => 'REC-8', 'quantity' => 1], $this->storedFields($record));
     }
 
     public function test_numeric_keys_are_saved_as_object_keys(): void
@@ -332,8 +332,16 @@ class ModelWithFieldsTest extends FeatureTestCase
         return $record;
     }
 
+    private function assertSameFields(array $expected, array $actual): void
+    {
+        ksort($expected);
+        ksort($actual);
+
+        $this->assertSame($expected, $actual);
+    }
+
     private function storedFields(Record $record): array
     {
-        return json_decode(DB::table('fixtures.records')->where('id', $record->id)->value('fields'), true);
+        return json_decode(DB::table($this->tableOf(Record::class))->where('id', $record->id)->value('fields'), true);
     }
 }

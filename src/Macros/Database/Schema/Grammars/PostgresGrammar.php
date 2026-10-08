@@ -9,17 +9,17 @@ use Illuminate\Database\Schema\Grammars\PostgresGrammar as BasePostgresGrammar;
 
 class PostgresGrammar
 {
-    public static function add()
+    public static function compileFieldExtract(BasePostgresGrammar $grammar, Blueprint $blueprint, Fluent $command): string
     {
-        BasePostgresGrammar::macro('compileFieldExtract', function (Blueprint $blueprint, Fluent $command) {
-            if (!$command->expression)
-                $command->expression = '(fields ->> \''.$command->column.'\')::'.$command->type;
+        $column = $command->get('column');
+        $type = $command->get('type');
 
-            return "
-                ALTER TABLE {$blueprint->getTable()} ADD COLUMN {$command->column} {$command->type} GENERATED ALWAYS AS (
-                    {$command->expression}
-                ) STORED
-            ";
-        });
+        $expression = $command->get('expression') ?: '(fields ->> \''.$column.'\')::'.$type;
+
+        return "
+            ALTER TABLE {$blueprint->getTable()} ADD COLUMN {$column} {$type} GENERATED ALWAYS AS (
+                {$expression}
+            ) STORED
+        ";
     }
 }

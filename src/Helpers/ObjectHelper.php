@@ -186,7 +186,7 @@ class ObjectHelper
                 $like = '%'.addcslashes($search, '%_\\').'%';
 
                 foreach (self::getTitleCodes($class) as $code) {
-                    $query->orWhere('fields->'.$code, 'ilike', $like);
+                    DatabaseHelper::orWhereLike($query, 'fields->'.$code, $like);
                 }
             });
         }

@@ -31,6 +31,7 @@ use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
 use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
 
+use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 use Amarenkov\MutableContent\Helpers\LogHelper;
 
@@ -146,7 +147,7 @@ class ModelWithFields extends Model
             $result = [];
 
             foreach ($model->getConnection()->getSchemaBuilder()->getColumns($model->getTable()) as $column) {
-                if ($column['generation'] !== null && preg_match('/^(?:character varying|character)\((\d+)\)$/', $column['type'], $matches)) {
+                if ($column['generation'] !== null && preg_match('/^(?:character varying|character|varchar|char)\((\d+)\)$/', $column['type'], $matches)) {
                     $result[$column['name']] = (int)$matches[1];
                 }
             }
@@ -382,11 +383,11 @@ class ModelWithFields extends Model
 
         $connection = $this->getConnection();
 
-        if ($connection->getDriverName() !== 'pgsql') {
-            return null;
-        }
-
         $column = $connection->getQueryGrammar()->wrap(self::FIELDS_COLUMN);
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            return $this->mariaDbFieldsUpdateExpression($column, $changed, $removed);
+        }
 
         $sql = 'case when jsonb_typeof('.$column.") = 'object' then ".$column." else '{}'::jsonb end";
 
@@ -396,6 +397,27 @@ class ModelWithFields extends Model
 
         if ($changed) {
             $sql .= ' || '.$connection->escape($this->asJson((object)$changed)).'::jsonb';
+        }
+
+        return new Expression($sql);
+    }
+
+    protected function mariaDbFieldsUpdateExpression(string $column, array $changed, array $removed): Expression
+    {
+        $connection = $this->getConnection();
+
+        $path = fn ($key) => $connection->escape('$."'.addcslashes((string)$key, '"\\').'"');
+
+        $sql = 'case when json_type('.$column.") = 'OBJECT' then ".$column." else '{}' end";
+
+        if ($removed) {
+            $sql = 'json_remove('.$sql.', '.implode(', ', array_map($path, $removed)).')';
+        }
+
+        if ($changed) {
+            $json = $connection->escape($this->asJson((object)$changed));
+
+            $sql = 'json_set('.$sql.', '.implode(', ', array_map(fn ($key) => $path($key).', json_extract('.$json.', '.$path($key).')', array_keys($changed))).')';
         }
 
         return new Expression($sql);
@@ -522,6 +544,14 @@ class ModelWithFields extends Model
     }
 
     // public
+    /**
+     * Table name; "schema.table" becomes "schema__table" on MariaDB.
+     */
+    public function getTable()
+    {
+        return DatabaseHelper::tableName(parent::getTable(), $this->getConnection());
+    }
+
     /**
      * Usage scopes of this object.
      *

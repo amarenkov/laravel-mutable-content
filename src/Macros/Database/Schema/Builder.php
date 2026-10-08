@@ -9,18 +9,14 @@ use LogicException;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Schema\Builder as BaseBuilder;
 
+use Amarenkov\MutableContent\Helpers\DatabaseHelper;
+
 class Builder
 {
     // protected
-    public static function getLogsTableName($table)
+    public static function getLogsTableName($table, ?Connection $connection = null)
     {
-        $result = $table;
-
-        if (strpos($result, '.') !== false) {
-            $result = str_replace('.', '_', $result);
-        }
-
-        return 'logs.'. $result;
+        return DatabaseHelper::logsTableName($table, $connection);
     }
 
     /**
@@ -28,7 +24,15 @@ class Builder
      */
     public static function createLogTriggers(Connection $connection, string $table): void
     {
-        $logsTable = static::getLogsTableName($table);
+        DatabaseHelper::driver($connection);
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            static::createMariaDbLogTriggers($connection, $table);
+
+            return;
+        }
+
+        $logsTable = static::getLogsTableName($table, $connection);
 
         $connection->statement("
             CREATE OR REPLACE FUNCTION {$logsTable}_log_after_update()
@@ -122,6 +126,73 @@ class Builder
     }
 
     /**
+     * MariaDB triggers have no transition tables and cannot update their own table: the author goes to the log
+     * through session variables and is cleared in BEFORE triggers.
+     */
+    protected static function createMariaDbLogTriggers(Connection $connection, string $table): void
+    {
+        $table = DatabaseHelper::tableName($table, $connection);
+        $logsTable = static::getLogsTableName($table, $connection);
+
+        $grammar = $connection->getQueryGrammar();
+
+        $wrappedTable = $grammar->wrapTable($table);
+        $wrappedLogsTable = $grammar->wrapTable($logsTable);
+
+        [$beforeInsert, $afterInsert, $beforeUpdate] = static::mariaDbLogTriggerNames($table);
+
+        $connection->unprepared("
+            CREATE TRIGGER {$grammar->wrap($beforeInsert)} BEFORE INSERT ON {$wrappedTable} FOR EACH ROW
+            BEGIN
+                SET @mutable_content_log_user_id = NEW.updated_by_user_id, @mutable_content_log_comment = NEW.updated_with_comment;
+                SET NEW.updated_by_user_id = NULL, NEW.updated_with_comment = NULL;
+            END
+        ");
+
+        $connection->unprepared("
+            CREATE TRIGGER {$grammar->wrap($afterInsert)} AFTER INSERT ON {$wrappedTable} FOR EACH ROW
+            BEGIN
+                INSERT INTO {$wrappedLogsTable} (entity_id, fields_new, is_deleted, user_id, comment)
+                VALUES (NEW.id, NEW.fields, NEW.deleted_at IS NOT NULL, @mutable_content_log_user_id, @mutable_content_log_comment);
+            END
+        ");
+
+        $connection->unprepared("
+            CREATE TRIGGER {$grammar->wrap($beforeUpdate)} BEFORE UPDATE ON {$wrappedTable} FOR EACH ROW
+            BEGIN
+                IF OLD.fields IS NULL OR NEW.fields IS NULL OR NOT JSON_EQUALS(OLD.fields, NEW.fields)
+                    OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL) THEN
+                    INSERT INTO {$wrappedLogsTable} (entity_id, fields_old, fields_new, is_deleted, user_id, comment)
+                    VALUES (NEW.id, OLD.fields, NEW.fields, NEW.deleted_at IS NOT NULL, NEW.updated_by_user_id, NEW.updated_with_comment);
+                END IF;
+
+                SET NEW.updated_by_user_id = NULL, NEW.updated_with_comment = NULL;
+            END
+        ");
+    }
+
+    public static function dropMariaDbLogTriggers(Connection $connection, string $table): void
+    {
+        $grammar = $connection->getQueryGrammar();
+
+        foreach (static::mariaDbLogTriggerNames(DatabaseHelper::tableName($table, $connection)) as $trigger) {
+            $connection->unprepared('DROP TRIGGER IF EXISTS '.$grammar->wrap($trigger));
+        }
+    }
+
+    /**
+     * @return array{string, string, string}
+     */
+    protected static function mariaDbLogTriggerNames(string $table): array
+    {
+        return [
+            DatabaseHelper::identifier($table, 'log_before_insert'),
+            DatabaseHelper::identifier($table, 'log_after_insert'),
+            DatabaseHelper::identifier($table, 'log_before_update'),
+        ];
+    }
+
+    /**
      * Rename schema indexes and sequences by exact name or name prefix: old => new. The first match wins.
      *
      * @param array<string, string> $prefixes
@@ -153,10 +224,16 @@ class Builder
     public static function add()
     {
         BaseBuilder::macro('createSchema', function ($schema) {
+            if (DatabaseHelper::isMariaDb($this->getConnection())) {
+                return;
+            }
+
             $this->getConnection()->statement("CREATE SCHEMA IF NOT EXISTS {$schema};");
         });
 
         BaseBuilder::macro('createWithLog', function ($table, Closure $callback) {
+            $table = DatabaseHelper::tableName($table, $this->getConnection());
+
             $blueprint = tap($this->createBlueprint($table), function ($blueprint) use ($callback) {
                 $blueprint->create();
 
@@ -186,9 +263,9 @@ class Builder
             $this->build($blueprint);
 
             // logs section
-            $this->createSchema('logs');
+            $this->createSchema(DatabaseHelper::LOGS_SCHEMA);
             
-            $logsTable = Builder::getLogsTableName($table);
+            $logsTable = Builder::getLogsTableName($table, $this->getConnection());
             
             $blueprint = tap($this->createBlueprint($logsTable), function ($blueprint) {
                 $blueprint->create();
@@ -218,15 +295,21 @@ class Builder
         });
 
         BaseBuilder::macro('dropIfExistsWithLog', function ($table) {
+            $table = DatabaseHelper::tableName($table, $this->getConnection());
+
             $this->build(tap($this->createBlueprint($table), function ($blueprint) {
                 $blueprint->dropIfExists();
             }));
 
-            $logsTable = Builder::getLogsTableName($table);
+            $logsTable = Builder::getLogsTableName($table, $this->getConnection());
 
             $this->build(tap($this->createBlueprint($logsTable), function ($blueprint) {
                 $blueprint->dropIfExists();
             }));
+
+            if (DatabaseHelper::isMariaDb($this->getConnection())) {
+                return;
+            }
 
             $this->getConnection()->statement("DROP FUNCTION {$logsTable}_log_after_insert()");
             $this->getConnection()->statement("DROP FUNCTION {$logsTable}_log_after_update()");
@@ -242,8 +325,24 @@ class Builder
 
             $connection = $this->getConnection();
 
-            $fromLogsTable = Builder::getLogsTableName($from);
-            $toLogsTable = Builder::getLogsTableName($to);
+            if (DatabaseHelper::isMariaDb($connection)) {
+                $grammar = $connection->getQueryGrammar();
+
+                $from = DatabaseHelper::tableName($from, $connection);
+                $to = DatabaseHelper::tableName($to, $connection);
+
+                Builder::dropMariaDbLogTriggers($connection, $from);
+
+                $connection->statement('RENAME TABLE '.$grammar->wrapTable($from).' TO '.$grammar->wrapTable($to)
+                    .', '.$grammar->wrapTable(Builder::getLogsTableName($from, $connection)).' TO '.$grammar->wrapTable(Builder::getLogsTableName($to, $connection)));
+
+                Builder::createLogTriggers($connection, $to);
+
+                return;
+            }
+
+            $fromLogsTable = Builder::getLogsTableName($from, $connection);
+            $toLogsTable = Builder::getLogsTableName($to, $connection);
 
             $connection->statement("DROP TRIGGER log_after_insert ON {$from}");
             $connection->statement("DROP TRIGGER log_after_update ON {$from}");
@@ -270,6 +369,10 @@ class Builder
         });
 
         BaseBuilder::macro('upParseTimestamptz', function ($table) {
+            if (DatabaseHelper::isMariaDb($this->getConnection())) {
+                throw new LogicException('parse_timestamptz() is available on PostgreSQL only');
+            }
+
             $this->getConnection()->statement("
                 CREATE OR REPLACE FUNCTION parse_timestamptz(text)
                 RETURNS timestamptz

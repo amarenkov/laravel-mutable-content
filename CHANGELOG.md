@@ -7,6 +7,15 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MariaDB 10.7+ support (connection driver `mariadb`): schema macros, change log triggers, generated columns from `fieldExtract()`, saving only the changed fields and case-insensitive object search. A table name with a schema becomes a `schema__table` name in one database.
+- `Helpers\DatabaseHelper`: database driver, table and log table names for the connection, case-insensitive `whereLike()` / `orWhereLike()` on a column or a `fields->code` path.
+
+### Removed
+
+- The `2026_10_09_000000_add_id_to_log_tables` upgrade migration: the package migrations now only create tables from scratch, and `Schema::createWithLog()` creates log tables with an `id`. Installations older than 0.2.0 must upgrade to 0.3.x and run its migrations first.
+
 ## [0.3.1] - 2026-10-08
 
 ### Fixed

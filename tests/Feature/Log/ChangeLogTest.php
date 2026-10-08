@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 use LogicException;
 
+use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\LogHelper;
 use Amarenkov\MutableContent\Models\Log\Entry;
 
@@ -17,12 +18,12 @@ use Amarenkov\MutableContent\Tests\Fixtures\Models\Record;
 
 class ChangeLogTest extends FeatureTestCase
 {
-    protected function logRows(string $table, int $id): array
+    protected function logRows(string $class, int $id): array
     {
-        return DB::table($table)->where('entity_id', $id)->orderBy('id')->get()->map(fn ($row) => [
+        return DB::table($this->logsTableOf($class))->where('entity_id', $id)->orderBy('id')->get()->map(fn ($row) => [
             'old' => json_decode((string)$row->fields_old, true),
             'new' => json_decode((string)$row->fields_new, true),
-            'is_deleted' => $row->is_deleted,
+            'is_deleted' => (bool)$row->is_deleted,
             'user_id' => $row->user_id,
             'comment' => $row->comment,
         ])->all();
@@ -53,7 +54,7 @@ class ChangeLogTest extends FeatureTestCase
 
         $record->restore();
 
-        $rows = $this->logRows('logs.fixtures_records', $record->id);
+        $rows = $this->logRows(Record::class, $record->id);
 
         $this->assertCount(4, $rows);
 
@@ -68,7 +69,7 @@ class ChangeLogTest extends FeatureTestCase
         $record = $this->makeRecord();
 
         $this->assertNull($record->updated_by_user_id);
-        $this->assertSame([null, null], array_values((array)DB::table('fixtures.records')->where('id', $record->id)->first(['updated_by_user_id', 'updated_with_comment'])));
+        $this->assertSame([null, null], array_values((array)DB::table($this->tableOf(Record::class))->where('id', $record->id)->first(['updated_by_user_id', 'updated_with_comment'])));
     }
 
     public function test_actions_and_descriptions(): void
@@ -126,14 +127,23 @@ class ChangeLogTest extends FeatureTestCase
     {
         $this->makeRecord();
 
+        $this->rebuildDatabaseAfterTest();
+
         Schema::renameWithLog('fixtures.records', 'fixtures.archived_records');
 
-        $this->assertTrue(Schema::hasTable('fixtures.archived_records'));
-        $this->assertTrue(Schema::hasTable('logs.fixtures_archived_records'));
+        $table = DatabaseHelper::tableName('fixtures.archived_records');
+        $logsTable = DatabaseHelper::logsTableName('fixtures.archived_records');
 
-        DB::table('fixtures.archived_records')->update(['fields' => json_encode(['code' => 'REC-1', 'quantity' => 5])]);
+        $this->assertTrue(Schema::hasTable($table));
+        $this->assertTrue(Schema::hasTable($logsTable));
 
-        $this->assertSame(2, DB::table('logs.fixtures_archived_records')->count());
+        DB::table($table)->update(['fields' => json_encode(['code' => 'REC-1', 'quantity' => 5])]);
+
+        $this->assertSame(2, DB::table($logsTable)->count());
+
+        if (DatabaseHelper::isMariaDb()) {
+            return;
+        }
 
         $relations = DB::table('pg_class')->join('pg_namespace', 'pg_namespace.oid', '=', 'pg_class.relnamespace')
             ->where('pg_namespace.nspname', 'logs')->where('pg_class.relname', 'like', 'fixtures_%records%')->pluck('relname')->all();
@@ -170,18 +180,5 @@ class ChangeLogTest extends FeatureTestCase
             ->all();
 
         $this->assertSame([['Quantity: 3 → 4'], ['Quantity: 2 → 3'], ['Quantity: 1 → 2'], ['Code: REC-1', 'Quantity: 1']], $descriptions);
-    }
-
-    public function test_upgrade_migration_adds_id_to_old_log_tables(): void
-    {
-        DB::statement('CREATE TABLE logs.legacy (entity_id integer, comment varchar(255))');
-        DB::table('logs.legacy')->insert([['entity_id' => 1, 'comment' => 'first'], ['entity_id' => 1, 'comment' => 'second']]);
-
-        $migration = require __DIR__.'/../../../database/migrations/2026_10_09_000000_add_id_to_log_tables.php';
-        $migration->up();
-        $migration->up();
-
-        $this->assertSame(['first', 'second'], DB::table('logs.legacy')->orderBy('id')->pluck('comment')->all());
-        $this->assertSame(3, DB::table('logs.legacy')->insertGetId(['entity_id' => 1, 'comment' => 'third']));
     }
 }
