@@ -198,7 +198,7 @@ class ModelWithFields extends Model
     public static function getFieldDefinitions(?array $scopes = null)
     {
         if (static::$fieldDefinitions === false) {
-            throw new LogicException('Public static $fieldDefinitions must be rediclared in a child class '.static::class.' with value null');
+            throw new LogicException('Protected static $fieldDefinitions must be redeclared in '.static::class.' with value null');
         }
 
         $scopes ??= static::getFieldScopes();

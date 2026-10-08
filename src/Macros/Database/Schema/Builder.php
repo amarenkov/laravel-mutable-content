@@ -180,7 +180,7 @@ class Builder
             $updatedWithComment = in_array('updated_with_comment', $columns);
 
             if (!($hasSoftDelete && $hasUpdatedByUserId && $updatedWithComment)) {
-                throw new LogicException("Oh, sorry, for that combination of fields I must refactor my log function.");
+                throw new LogicException("Table {$table} must contain deleted_at, updated_by_user_id and updated_with_comment columns (use softDeletes and fieldsUpdatedBy functions e.g.).");
             }
 
             $this->build($blueprint);
