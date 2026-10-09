@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-09
+
 ### Added
 
 - `Database\Log\LogContext`: log data, one JSON object with the author (`user_id`), the comment (`comment`) and any other keys, passed to the triggers through the database session (the `mutable_content.data` setting on PostgreSQL, the `@mutable_content_log_data` variable on MariaDB). `run()` applies data to everything inside, including query builder updates and raw SQL, merging it over the outer run; `set()` / `clear()` hold default data for a request, a job or a command, cleared before every queue job and Octane request. Plain SQL can set the data itself.
@@ -94,7 +96,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.2.0...v0.3.0
