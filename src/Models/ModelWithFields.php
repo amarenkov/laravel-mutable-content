@@ -9,7 +9,6 @@ use Throwable;
 
 use ReflectionClass;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 
@@ -31,11 +30,14 @@ use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
 use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
 
+use Amarenkov\MutableContent\Database\Log\LogContext;
+use Amarenkov\MutableContent\Database\Log\LogEvent;
+
 use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
-use Amarenkov\MutableContent\Helpers\LogHelper;
 
 use Amarenkov\MutableContent\Models\Field\Usage as UsageModel;
+use Amarenkov\MutableContent\Models\Log\ModelLogContext;
 
 use Amarenkov\MutableContent\ValueObjects\Area;
 use Amarenkov\MutableContent\ValueObjects\Density;
@@ -51,11 +53,6 @@ class ModelWithFields extends Model
     use SoftDeletes;
 
     // const
-    public const COLUMN_UPDATED_BY_USER_ID = 'updated_by_user_id';
-    public const COLUMN_UPDATED_WITH_COMMENT = 'updated_with_comment';
-
-    public const COMMENT_MAX_LENGTH = 255;
-
     public const FIELDS_COLUMN = 'fields';
 
     public const FIELDS_PATH_PREFIX = 'fields->';
@@ -266,6 +263,8 @@ class ModelWithFields extends Model
     }
 
     // protected
+    protected ?ModelLogContext $pendingLogContext = null;
+
     protected function casts(): array
     {
         return [
@@ -423,21 +422,18 @@ class ModelWithFields extends Model
         return new Expression($sql);
     }
 
-    protected function forgetUpdatedBy()
+    /**
+     * Run a write with the log data set by withLogContext(), forgotten after a successful write.
+     */
+    protected function runInLogContext(callable $callback): mixed
     {
-        foreach ([self::COLUMN_UPDATED_BY_USER_ID, self::COLUMN_UPDATED_WITH_COMMENT] as $column) {
-            if (array_key_exists($column, $this->attributes)) {
-                $this->attributes[$column] = null;
-                $this->original[$column] = null;
-            }
+        $result = app(LogContext::class)->run($callback, $this->pendingLogContext ?? [], $this->getConnectionName());
+
+        if ($result !== false) {
+            $this->pendingLogContext = null;
         }
-    }
 
-    protected function finishSave(array $options)
-    {
-        parent::finishSave($options);
-
-        $this->forgetUpdatedBy();
+        return $result;
     }
 
     protected function findTrashedDuplicate(): ?static
@@ -478,13 +474,6 @@ class ModelWithFields extends Model
             $this->fields ? $this->fields->toArray() : []
         );
 
-        $updatedBy = [];
-        foreach ([self::COLUMN_UPDATED_BY_USER_ID, self::COLUMN_UPDATED_WITH_COMMENT] as $column) {
-            if (array_key_exists($column, $this->attributes)) {
-                $updatedBy[$column] = $this->attributes[$column];
-            }
-        }
-
         $this->classCastCache = [];
         $this->attributeCastCache = [];
 
@@ -492,10 +481,6 @@ class ModelWithFields extends Model
         $this->exists = true;
 
         $this->writeFields($fields);
-
-        foreach ($updatedBy as $column => $value) {
-            $this->attributes[$column] = $value;
-        }
 
         $this->{$this->getDeletedAtColumn()} = null;
 
@@ -510,37 +495,6 @@ class ModelWithFields extends Model
         }
 
         return $saved;
-    }
-
-    protected function runSoftDelete()
-    {
-        $query = $this->setKeysForSaveQuery($this->newModelQuery());
-
-        $time = $this->freshTimestamp();
-
-        $columns = [$this->getDeletedAtColumn() => $this->fromDateTime($time)];
-
-        foreach ([self::COLUMN_UPDATED_BY_USER_ID, self::COLUMN_UPDATED_WITH_COMMENT] as $column) {
-            if (array_key_exists($column, $this->attributes)) {
-                $columns[$column] = $this->attributes[$column];
-            }
-        }
-
-        $this->{$this->getDeletedAtColumn()} = $time;
-
-        if ($this->usesTimestamps() && ! is_null($this->getUpdatedAtColumn())) {
-            $this->{$this->getUpdatedAtColumn()} = $time;
-
-            $columns[$this->getUpdatedAtColumn()] = $this->fromDateTime($time);
-        }
-
-        $query->update($columns);
-
-        $this->syncOriginalAttributes(array_keys($columns));
-
-        $this->forgetUpdatedBy();
-
-        $this->fireModelEvent('trashed', false);
     }
 
     // public
@@ -700,37 +654,38 @@ class ModelWithFields extends Model
     }
 
     /**
-     * Write an event without field changes to the object log (LogHelper::ACTION_EVENT).
+     * Event without field changes for the object log, written by write() of the result.
+     * The event is a translation key or a text, shown with __($event, scalar values of the data).
      */
-    public function writeLog(string $message, ?int $userId = null): void
+    public function logEvent(string $event, array $data = []): LogEvent
     {
-        if (!$this->exists) {
-            throw new LogicException('Cannot write log of unsaved '.static::class.' object');
-        }
-
-        DB::table(LogHelper::getLogsTable(static::class))->insert([
-            LogHelper::COLUMN_ENTITY_ID => $this->getKey(),
-            LogHelper::COLUMN_IS_DELETED => $this->{$this->getDeletedAtColumn()} !== null,
-            LogHelper::COLUMN_USER_ID => $userId,
-            LogHelper::COLUMN_COMMENT => mb_substr($message, 0, self::COMMENT_MAX_LENGTH),
-        ]);
+        return new LogEvent($this, $event, $data);
     }
 
-    public function setUpdatedBy($comment = null, $userId = null)
+    /**
+     * Context of the log entry written automatically by the next save() or delete(): author, comment and anything else.
+     * The comment is set when given and kept otherwise.
+     */
+    public function withLogContext(?string $comment = null): ModelLogContext
     {
-        if ($comment !== null) {
-            $comment = mb_substr((string)$comment, 0, self::COMMENT_MAX_LENGTH);
-        }
+        $this->pendingLogContext ??= new ModelLogContext($this);
 
-        $this->updated_with_comment = $comment;
-        $this->updated_by_user_id = $userId;
+        return $comment === null ? $this->pendingLogContext : $this->pendingLogContext->comment($comment);
     }
 
-    public function setUpdatedByIfDirty($comment = null, $userId = null)
+    public function __clone()
     {
-        if ($this->isDirty()) {
-            $this->setUpdatedBy($comment, $userId);
-        }
+        $this->pendingLogContext = null;
+    }
+
+    public function save(array $options = [])
+    {
+        return $this->runInLogContext(fn () => parent::save($options));
+    }
+
+    public function delete()
+    {
+        return $this->runInLogContext(fn () => parent::delete());
     }
 
     public function fill(array $attributes)

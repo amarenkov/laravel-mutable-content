@@ -34,6 +34,7 @@ abstract class FeatureTestCase extends TestCase
         parent::defineEnvironment($app);
 
         $app['config']->set('database.default', env('DB_CONNECTION', 'pgsql'));
+        $app['config']->set('database.connections.mariadb.timezone', '+00:00');
     }
 
     protected function setUp(): void

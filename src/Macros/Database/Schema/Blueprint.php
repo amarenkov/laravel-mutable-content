@@ -24,13 +24,6 @@ class Blueprint
             return $this->timestamp('updated_at')->useCurrent();
         });
 
-        BaseBlueprint::macro('fieldsUpdatedBy', function () {
-            return new Collection([
-                $this->integer('updated_by_user_id')->nullable(),
-                $this->string('updated_with_comment')->nullable()
-            ]);
-        });
-
         BaseBlueprint::macro('fieldExtract', function ($column) {
             return $this->addCommand('fieldExtract', ['column' => $column]);
         });

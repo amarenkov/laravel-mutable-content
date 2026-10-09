@@ -29,8 +29,6 @@ class FieldCodeHelper
         'created_at',
         'updated_at',
         'deleted_at',
-        ModelWithFields::COLUMN_UPDATED_BY_USER_ID,
-        ModelWithFields::COLUMN_UPDATED_WITH_COMMENT,
     ];
 
     // static

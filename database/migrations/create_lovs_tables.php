@@ -19,8 +19,6 @@ return new class extends Migration
             
             $table->softDeletes();
 
-            $table->fieldsUpdatedBy();
-
             $table->fieldExtract(Field::COMMON_CODE_CODE)->type('varchar(255)');
             $table->fieldExtract(Field::COMMON_CODE_LABEL)->type('varchar(255)');
 
@@ -34,8 +32,6 @@ return new class extends Migration
             $table->fieldsUpdatedAt();
             
             $table->softDeletes();
-
-            $table->fieldsUpdatedBy();
 
             $table->fieldExtract(LovItemModel::FIELD_LOV_ID)->type('int');
             $table->fieldExtract(Field::COMMON_CODE_CODE)->type('varchar(255)');

@@ -12,7 +12,6 @@ return new class extends Migration
             $table->fieldsBase();
             $table->fieldsUpdatedAt();
             $table->softDeletes();
-            $table->fieldsUpdatedBy();
 
             $table->fieldExtract('code')->type('varchar(20)');
             $table->unique('code');
@@ -24,7 +23,6 @@ return new class extends Migration
             $table->fieldsBase();
             $table->fieldsUpdatedAt();
             $table->softDeletes();
-            $table->fieldsUpdatedBy();
 
             $table->fieldExtract('code')->type('varchar(50)');
             $table->fieldExtract('owner_id')->type('int');

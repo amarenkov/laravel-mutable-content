@@ -7,6 +7,39 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Database\Log\LogContext`: log data, one JSON object with the author (`user_id`), the comment (`comment`) and any other keys, passed to the triggers through the database session (the `mutable_content.data` setting on PostgreSQL, the `@mutable_content_log_data` variable on MariaDB). `run()` applies data to everything inside, including query builder updates and raw SQL, merging it over the outer run; `set()` / `clear()` hold default data for a request, a job or a command, cleared before every queue job and Octane request. Plain SQL can set the data itself.
+- Log table columns: `action`, `data` (JSON), `transaction_id` (the PostgreSQL transaction id; on MariaDB an id of the transaction for writes inside a context) and `compression_status` (`pending`, `compressed`, `error`). `user_id` is generated from `data` and indexed.
+- `LogHelper::compress()` and the `mutable-content:compress-log` command replace the fields before and after of uncompressed entries with the changed fields in `fields_changed`, up to a limit per run, skipping entries locked by a parallel run; an update without changes is left as is with the `error` status and a warning in the application log; `LogHelper::prune()` and `mutable-content:prune-log` delete old entries in chunks. The package schedules `compress-log` every minute without overlapping (the lock expires in an hour) (`config/mutable-content.php`: `log.compress.schedule`, a cron expression or null to disable, and `log.compress.limit`; publish tag `mutable-content-config`); `prune-log` is never scheduled by the package.
+- `Domain\Log\LogData` with chainable `user()` (an integer or a string id), `comment()`, `data()` and `set()`, accepted by `LogContext::set()` and `run()`; `Domain\Log\Changes`, the changed fields of a log entry (`Changes::between($old, $new)`).
+- `Entry::changes()` returning `Changes`, `Entry::comment()`; `LogHelper::describeEvent()`, `LogHelper::decode()`.
+
+### Changed
+
+- `setUpdatedBy()` is replaced by `withLogContext(?string $comment = null)`, returning the model's `Models\Log\ModelLogContext` (`LogData` with `save()` and `delete()`; a given comment is set, null keeps the previous one), kept in the model until the next successful `save()` or `delete()`, which run in a transaction with it.
+- `writeLog($message, $userId)` is replaced by `logEvent(string $event, array $data = [])`, returning a `Database\Log\LogEvent` (`LogData` with `write()`). The event is a translation key or a text, stored in `data` over the pending log context of the model and translated when shown (`Entry::describe()`) with scalar values of the data as replacements.
+- Log table columns: the comment is stored in `data` without a length limit instead of the `comment` column, `entity_id` and `user_id` are `bigint`, `date` is `timestamptz` on PostgreSQL.
+- `Entry::action()` reads the `action` column; `Entry::date` is in the application timezone.
+- A save that changes fields and deletes or restores the object is logged as a deletion or restoration with the changed fields.
+- The package seeders write in one log context and transaction instead of a transaction per record.
+- `LogHelper::describeChanges(string $class, Changes $changes)` takes the changes instead of old and new fields.
+- `Schema::createWithLog()` requires `fields`, `updated_at` and `deleted_at` columns only.
+- `LogHelper::getLogsTable()` and `LogHelper::query()` use the connection of the model instead of the default one.
+- PostgreSQL log triggers no longer update the logged rows a second time, and changes made by other triggers are logged too.
+- `Builder::createLogTriggers()` replaces the existing log triggers on MariaDB too, including the `_log_before_insert` and `_log_before_update` triggers of 0.4.
+
+### Removed
+
+- `updated_by_user_id` and `updated_with_comment` columns, the `comment` and `is_deleted` columns of log tables (the `action` column tells deletions and restorations), the `fieldsUpdatedBy()` Blueprint macro, `ModelWithFields::COLUMN_UPDATED_BY_USER_ID`, `COLUMN_UPDATED_WITH_COMMENT` and `COMMENT_MAX_LENGTH`.
+- `ModelWithFields::setUpdatedByIfDirty()`: use `withLogContext()`.
+- `LogHelper::getAction()`: the action is stored in the log.
+- `LogHelper::getChanges()`: use `Changes::between()`.
+
+### Upgrading
+
+Migrations of existing tables are not provided. For every table created with `Schema::createWithLog()`: add the new log table columns, fill `action` from the existing entries (`is_deleted` tells deletions and restorations, then drop it) and `data` from `user_id` and `comment`, make `user_id` generated from `data`, change the column types, drop `updated_by_user_id` and `updated_with_comment`, and recreate the triggers with `Macros\Database\Schema\Builder::createLogTriggers()` (on MariaDB before dropping the columns: it also drops the 0.4 triggers that use them). Replace `fieldsUpdatedBy()` in old migrations, `setUpdatedBy($comment, $userId)` and `setUpdatedByIfDirty()` with `withLogContext($comment)->user($userId)`, and `writeLog($message, $userId)` with `logEvent($message)->user($userId)->write()`.
+
 ## [0.4.0] - 2026-10-09
 
 ### Added

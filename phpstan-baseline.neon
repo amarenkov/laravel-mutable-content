@@ -7,19 +7,7 @@ parameters:
 			path: src/Database/Seeders/FieldsSeeder.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:setUpdatedByIfDirty\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Database/Seeders/FieldsSeeder.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:setSystemFields\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Database/Seeders/LovsSeeder.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:setUpdatedByIfDirty\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: src/Database/Seeders/LovsSeeder.php
@@ -53,36 +41,6 @@ parameters:
 			identifier: property.notFound
 			count: 4
 			path: src/Models/Field/Usage.php
-
-		-
-			message: '#^Access to an undefined property Amarenkov\\MutableContent\\Models\\Log\\Entry\:\:\$comment\.$#'
-			identifier: property.notFound
-			count: 1
-			path: src/Models/Log/Entry.php
-
-		-
-			message: '#^Access to an undefined property Amarenkov\\MutableContent\\Models\\Log\\Entry\:\:\$fields_new\.$#'
-			identifier: property.notFound
-			count: 2
-			path: src/Models/Log/Entry.php
-
-		-
-			message: '#^Access to an undefined property Amarenkov\\MutableContent\\Models\\Log\\Entry\:\:\$fields_old\.$#'
-			identifier: property.notFound
-			count: 2
-			path: src/Models/Log/Entry.php
-
-		-
-			message: '#^Access to an undefined property Amarenkov\\MutableContent\\Models\\Log\\Entry\:\:\$is_deleted\.$#'
-			identifier: property.notFound
-			count: 1
-			path: src/Models/Log/Entry.php
-
-		-
-			message: '#^Access to an undefined property Amarenkov\\MutableContent\\Models\\Log\\Entry\:\:\$object_class\.$#'
-			identifier: property.notFound
-			count: 1
-			path: src/Models/Log/Entry.php
 
 		-
 			message: '#^Unsafe usage of new static\(\)\.$#'

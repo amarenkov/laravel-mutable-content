@@ -9,7 +9,11 @@ use LogicException;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Schema\Builder as BaseBuilder;
 
+use Amarenkov\MutableContent\Database\Log\LogContext;
+use Amarenkov\MutableContent\Domain\Log\LogData;
+
 use Amarenkov\MutableContent\Helpers\DatabaseHelper;
+use Amarenkov\MutableContent\Helpers\LogHelper;
 
 class Builder
 {
@@ -34,43 +38,38 @@ class Builder
 
         $logsTable = static::getLogsTableName($table, $connection);
 
+        $context = LogContext::sqlExpressions($connection);
+
         $connection->statement("
             CREATE OR REPLACE FUNCTION {$logsTable}_log_after_update()
             returns trigger AS $$
             BEGIN
-                IF pg_trigger_depth() > 1 THEN
-                    RETURN NULL;
-                END IF;
-
                 INSERT INTO {$logsTable} (
                     entity_id,
+                    action,
                     fields_old,
                     fields_new,
-                    is_deleted,
-                    user_id,
-                    comment
+                    data,
+                    transaction_id
                 )
                 SELECT
                     nd.id,
+                    CASE
+                        WHEN od.id IS NULL THEN '".LogHelper::ACTION_CREATED."'
+                        WHEN nd.deleted_at IS NOT NULL AND od.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
+                        WHEN nd.deleted_at IS NULL AND od.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'
+                        ELSE '".LogHelper::ACTION_UPDATED."'
+                    END,
                     od.fields,
                     nd.fields,
-                    CASE WHEN nd.deleted_at IS NOT NULL THEN true ELSE false END,
-                    nd.updated_by_user_id,
-                    nd.updated_with_comment
+                    {$context[LogContext::DATA]},
+                    {$context[LogContext::TRANSACTION_ID]}
                 FROM new_data nd
                 LEFT JOIN old_data od ON nd.id = od.id
                 WHERE
-                    od.fields IS NULL OR
+                    od.id IS NULL OR
                     nd.fields IS DISTINCT FROM od.fields OR
-                    (nd.deleted_at IS NULL AND od.deleted_at IS NOT NULL) OR
-                    (nd.deleted_at IS NOT NULL AND od.deleted_at IS NULL);
-                
-                UPDATE {$table} t
-                SET 
-                    updated_by_user_id = NULL, 
-                    updated_with_comment = NULL
-                FROM new_data nd
-                WHERE t.id = nd.id;
+                    (nd.deleted_at IS NULL) <> (od.deleted_at IS NULL);
 
                 RETURN NULL;
             END;
@@ -83,25 +82,18 @@ class Builder
             BEGIN
                 INSERT INTO {$logsTable} (
                     entity_id,
+                    action,
                     fields_new,
-                    is_deleted,
-                    user_id,
-                    comment
+                    data,
+                    transaction_id
                 )
                 SELECT
                     nd.id,
+                    '".LogHelper::ACTION_CREATED."',
                     nd.fields,
-                    CASE WHEN nd.deleted_at IS NOT NULL THEN true ELSE false END,
-                    nd.updated_by_user_id,
-                    nd.updated_with_comment
+                    {$context[LogContext::DATA]},
+                    {$context[LogContext::TRANSACTION_ID]}
                 FROM new_data nd;
-                
-                UPDATE {$table} t
-                SET 
-                    updated_by_user_id = NULL, 
-                    updated_with_comment = NULL
-                FROM new_data nd
-                WHERE t.id = nd.id;
 
                 RETURN NULL;
             END;
@@ -126,8 +118,8 @@ class Builder
     }
 
     /**
-     * MariaDB triggers have no transition tables and cannot update their own table: the author goes to the log
-     * through session variables and is cleared in BEFORE triggers.
+     * MariaDB has no statement triggers with transition tables: rows are logged one by one.
+     * Existing log triggers of the table, also of earlier versions, are replaced.
      */
     protected static function createMariaDbLogTriggers(Connection $connection, string $table): void
     {
@@ -139,56 +131,83 @@ class Builder
         $wrappedTable = $grammar->wrapTable($table);
         $wrappedLogsTable = $grammar->wrapTable($logsTable);
 
-        [$beforeInsert, $afterInsert, $beforeUpdate] = static::mariaDbLogTriggerNames($table);
+        $context = implode(', ', LogContext::sqlExpressions($connection));
 
-        $connection->unprepared("
-            CREATE TRIGGER {$grammar->wrap($beforeInsert)} BEFORE INSERT ON {$wrappedTable} FOR EACH ROW
-            BEGIN
-                SET @mutable_content_log_user_id = NEW.updated_by_user_id, @mutable_content_log_comment = NEW.updated_with_comment;
-                SET NEW.updated_by_user_id = NULL, NEW.updated_with_comment = NULL;
-            END
-        ");
+        static::dropMariaDbLogTriggers($connection, $table);
+
+        [$afterInsert, $afterUpdate] = static::mariaDbLogTriggerNames($table);
 
         $connection->unprepared("
             CREATE TRIGGER {$grammar->wrap($afterInsert)} AFTER INSERT ON {$wrappedTable} FOR EACH ROW
-            BEGIN
-                INSERT INTO {$wrappedLogsTable} (entity_id, fields_new, is_deleted, user_id, comment)
-                VALUES (NEW.id, NEW.fields, NEW.deleted_at IS NOT NULL, @mutable_content_log_user_id, @mutable_content_log_comment);
-            END
+            INSERT INTO {$wrappedLogsTable} (entity_id, action, fields_new, data, transaction_id)
+            VALUES (NEW.id, '".LogHelper::ACTION_CREATED."', NEW.fields, {$context})
         ");
 
         $connection->unprepared("
-            CREATE TRIGGER {$grammar->wrap($beforeUpdate)} BEFORE UPDATE ON {$wrappedTable} FOR EACH ROW
+            CREATE TRIGGER {$grammar->wrap($afterUpdate)} AFTER UPDATE ON {$wrappedTable} FOR EACH ROW
             BEGIN
                 IF OLD.fields IS NULL OR NEW.fields IS NULL OR NOT JSON_EQUALS(OLD.fields, NEW.fields)
                     OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL) THEN
-                    INSERT INTO {$wrappedLogsTable} (entity_id, fields_old, fields_new, is_deleted, user_id, comment)
-                    VALUES (NEW.id, OLD.fields, NEW.fields, NEW.deleted_at IS NOT NULL, NEW.updated_by_user_id, NEW.updated_with_comment);
+                    INSERT INTO {$wrappedLogsTable} (entity_id, action, fields_old, fields_new, data, transaction_id)
+                    VALUES (
+                        NEW.id,
+                        CASE
+                            WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
+                            WHEN NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'
+                            ELSE '".LogHelper::ACTION_UPDATED."'
+                        END,
+                        OLD.fields,
+                        NEW.fields,
+                        {$context}
+                    );
                 END IF;
-
-                SET NEW.updated_by_user_id = NULL, NEW.updated_with_comment = NULL;
             END
         ");
+    }
+
+    /**
+     * Author id of a log entry taken from its data, null unless it is a whole number.
+     */
+    public static function logUserIdExpression(Connection $connection): string
+    {
+        $pattern = "'^[0-9]{1,18}$'";
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            $value = "json_value(data, '$.".LogData::USER_ID."')";
+
+            return "case when {$value} regexp {$pattern} then cast({$value} as unsigned) end";
+        }
+
+        $value = "(data ->> '".LogData::USER_ID."')";
+
+        return "case when {$value} ~ {$pattern} then {$value}::bigint end";
     }
 
     public static function dropMariaDbLogTriggers(Connection $connection, string $table): void
     {
         $grammar = $connection->getQueryGrammar();
 
-        foreach (static::mariaDbLogTriggerNames(DatabaseHelper::tableName($table, $connection)) as $trigger) {
+        $table = DatabaseHelper::tableName($table, $connection);
+
+        $triggers = [
+            ...static::mariaDbLogTriggerNames($table),
+            DatabaseHelper::identifier($table, 'log_before_insert'),
+            DatabaseHelper::identifier($table, 'log_before_update'),
+        ];
+
+        foreach ($triggers as $trigger) {
             $connection->unprepared('DROP TRIGGER IF EXISTS '.$grammar->wrap($trigger));
         }
     }
 
     /**
-     * @return array{string, string, string}
+     * @return array{string, string}
      */
     protected static function mariaDbLogTriggerNames(string $table): array
     {
         return [
-            DatabaseHelper::identifier($table, 'log_before_insert'),
             DatabaseHelper::identifier($table, 'log_after_insert'),
-            DatabaseHelper::identifier($table, 'log_before_update'),
+            DatabaseHelper::identifier($table, 'log_after_update'),
         ];
     }
 
@@ -252,12 +271,8 @@ class Builder
                 throw new LogicException("Table {$table} must contain updated_at column (use fieldsUpdatedAt function e.g.).");
             }
 
-            $hasSoftDelete = in_array('deleted_at', $columns);
-            $hasUpdatedByUserId = in_array('updated_by_user_id', $columns);
-            $updatedWithComment = in_array('updated_with_comment', $columns);
-
-            if (!($hasSoftDelete && $hasUpdatedByUserId && $updatedWithComment)) {
-                throw new LogicException("Table {$table} must contain deleted_at, updated_by_user_id and updated_with_comment columns (use softDeletes and fieldsUpdatedBy functions e.g.).");
+            if (!in_array('deleted_at', $columns)) {
+                throw new LogicException("Table {$table} must contain deleted_at column (use softDeletes function e.g.).");
             }
 
             $this->build($blueprint);
@@ -272,21 +287,27 @@ class Builder
 
                 $blueprint->bigIncrements('id');
 
-                $blueprint->unsignedInteger('entity_id');
-                
+                $blueprint->unsignedBigInteger('entity_id');
+
+                $blueprint->string('action', 16);
+
                 $blueprint->jsonb('fields_old')->nullable();
                 $blueprint->jsonb('fields_new')->nullable();
                 $blueprint->jsonb('fields_changed')->nullable();
+                $blueprint->string('compression_status', 16)->default(LogHelper::COMPRESSION_PENDING);
 
-                $blueprint->boolean('is_deleted');
+                $blueprint->timestampTz('date')->useCurrent();
 
-                $blueprint->timestamp('date')->useCurrent();
-                
-                $blueprint->integer('user_id')->nullable();
-                $blueprint->string('comment')->nullable();
+                $blueprint->jsonb('data')->nullable();
+                $blueprint->unsignedBigInteger('user_id')->nullable()->storedAs(Builder::logUserIdExpression($this->getConnection()));
+
+                $blueprint->unsignedBigInteger('transaction_id')->nullable();
 
                 $blueprint->index('entity_id');
                 $blueprint->index('date');
+                $blueprint->index('user_id');
+                $blueprint->index('compression_status');
+                $blueprint->index('transaction_id');
             });
 
             $this->build($blueprint);

@@ -27,8 +27,8 @@ and it shows up in forms, tables, validation and API docs.
 5. **Data is not lost on write.** The fields column cannot be overwritten as a whole, keys that
    are not declared as fields are kept, and concurrent saves of different fields do not overwrite
    each other.
-6. **Who and why.** Every change in the log carries its author and comment, and an event without
-   field changes can be logged too (`writeLog()`).
+6. **Who and why.** Every change in the log carries its author, comment of any length and
+   any other structured data, and an event without field changes can be logged too (`logEvent()`).
 
 ## Features
 
@@ -51,7 +51,7 @@ and it shows up in forms, tables, validation and API docs.
   restores that record with its id and history (`uniqueFieldSets()`).
 - **Change log tables.** `Schema::createWithLog()` creates a table together with its log table
   in the `logs` schema and the triggers. `LogHelper` and `Models\Log\Entry` read the log back in a
-  human-readable form.
+  human-readable form. See [Change log](#change-log).
 - **References by code.** An `object` field can store an object code instead of its id
   (`link_by_code`), optionally accepting codes that do not exist yet (`allow_unlisted_codes`).
 
@@ -64,7 +64,9 @@ and it shows up in forms, tables, validation and API docs.
 On MariaDB a table name with a schema, such as `projects.projects`, becomes
 `projects__projects` in one database: models, `Schema::createWithLog()` and `LogHelper` translate
 it, so the same models and migrations work on both. `Schema::createSchema()` does nothing there.
-Use the model's `getTable()` instead of a literal name with a schema in raw queries.
+Use the model's `getTable()` instead of a literal name with a schema in raw queries. Log dates
+are set by the database, so set the connection `timezone` to the application timezone on
+MariaDB (on PostgreSQL the log date is `timestamptz`).
 
 ## Installation
 
@@ -126,7 +128,6 @@ Schema::createWithLog('projects.projects', function (Blueprint $table) {
     $table->fieldsBase();        // id, JSON fields, created_at
     $table->fieldsUpdatedAt();   // updated_at
     $table->softDeletes();       // deleted_at
-    $table->fieldsUpdatedBy();   // updated_by_user_id, updated_with_comment
 
     $table->fieldExtract('code')->type('varchar(50)');
     $table->unique('code');
@@ -138,7 +139,7 @@ Usage:
 ```php
 $project = new Project();
 $project->mergeWithFields(['code' => 'PRJ-1', 'priority' => 10]);
-$project->setUpdatedByIfDirty('import', $user->id); // goes to the change log
+$project->withLogContext('import')->user($user->id); // goes to the change log with the next save
 $project->save();
 
 $project->priority; // 10, read from JSON like a regular attribute
@@ -165,6 +166,91 @@ in the admin panel or in code with the `TypeSettings` attribute:
 const FIELD_TEAM_CODE = 'team_code';
 ```
 
+## Change log
+
+Database triggers write every insert and update of a table created by `Schema::createWithLog()`
+to its log table: the action (`created`, `updated`, `deleted`, `restored`, or `event` for
+`logEvent()`), the fields before and after, the log data and the id of the database
+transaction, so entries of one operation can be grouped.
+
+The log data is one JSON object: the author (`user_id`), the comment (`comment`) and any other
+keys of the application. The `user_id` column is generated from it for filtering by author.
+The data reaches the triggers through the database session, not through columns of the table:
+
+```php
+use Amarenkov\MutableContent\Database\Log\LogContext;
+use Amarenkov\MutableContent\Domain\Log\LogData;
+
+// the next save or delete
+$project->withLogContext('Imported from CSV')->user($user->id)->data(['source' => 'import'])->save();
+
+// everything inside, including query builder updates and raw SQL
+app(LogContext::class)->run(function () {
+    DB::table('projects.projects')->where('id', 1)->update([...]);
+}, ['user_id' => $user->id, 'comment' => 'Bulk fix']);
+
+// a default for a request, a job or a command, e.g. in a middleware
+app(LogContext::class)->set(new LogData()->user($request->user()?->id)->data(['ip' => $request->ip()]));
+```
+
+Data of a nested context is merged over the outer one by top-level keys. The default context is
+cleared before every queue job and Octane request.
+
+Plain SQL outside the application sets the context itself, in the same transaction on
+PostgreSQL:
+
+```sql
+-- PostgreSQL
+BEGIN;
+SELECT set_config('mutable_content.data', '{"user_id": 5, "comment": "Manual fix"}', true);
+UPDATE projects.projects SET fields = fields || '{"priority": 1}' WHERE id = 10;
+COMMIT;
+
+-- MariaDB: a session variable, reset it afterwards
+SET @mutable_content_log_data = '{"user_id": 5, "comment": "Manual fix"}';
+UPDATE projects__projects SET fields = json_set(fields, '$.priority', 1) WHERE id = 10;
+SET @mutable_content_log_data = NULL;
+```
+
+A change without a context is still logged, without an author. On MariaDB the transaction id
+is filled only for writes inside a context.
+
+Events without field changes take a translation key or a text, stored in the data as `event`
+and translated when the log is shown, with scalar values of the data as replacements. An event
+takes the pending `withLogContext()` of the model too and leaves it for the next save:
+
+```php
+// 'projects.log.sync_skipped' => 'Sync skipped: :reason'
+$project->logEvent('projects.log.sync_skipped', ['reason' => 'timeout'])
+    ->comment('Retry later')
+    ->user($user->id)
+    ->write();
+```
+
+The triggers write the full fields before and after. Compression replaces them with the changed
+fields only. The package schedules `mutable-content:compress-log` every minute without
+overlapping, so the application only needs the Laravel scheduler running (`schedule:run` in
+cron). Each run processes up to `--limit` entries of each class, and parallel runs skip each
+other's entries. Deletions, restorations and events get empty changes; an update without
+changes is left uncompressed with the `error` compression status and a warning in the
+application log, for review. Compression never retries such entries; after the review, return
+them with `UPDATE <log table> SET compression_status = 'pending' WHERE compression_status = 'error'`.
+
+The schedule and the limit are set in the config: `MUTABLE_CONTENT_LOG_COMPRESS_SCHEDULE`, a
+cron expression, empty to disable, and `MUTABLE_CONTENT_LOG_COMPRESS_LIMIT`. Publish it with
+`php artisan vendor:publish --tag=mutable-content-config`.
+
+Deleting old entries is up to the application: `mutable-content:prune-log` is never scheduled
+by the package. To delete entries older than three years every night:
+
+```php
+// routes/console.php
+Schedule::command('mutable-content:prune-log --days=1095')->daily();
+```
+
+Both commands take `--class=` to limit them to some classes (all registered classes by
+default), and the same is available as `LogHelper::compress()` and `LogHelper::prune()`.
+
 ## Translations
 
 Labels in attributes are passed through `__()` when read, so they can be translation keys or
@@ -183,15 +269,17 @@ the database label wins and is edited in the admin panel.
 - Every `ModelWithFields` subclass **must** redeclare
   `protected static array|bool|null $fieldDefinitions = null;`, otherwise a `LogicException` is
   thrown.
-- Call `setUpdatedByIfDirty()` before every `save()` (or `setUpdatedBy()` before `delete()`):
-  the log trigger takes the author and comment from service columns and clears them.
+- `withLogContext()` only adds context to the log entry that the next successful `save()` or
+  `delete()` writes automatically, it writes nothing by itself; without a comment it keeps the
+  comment given before. A save or delete with log context runs in a database transaction.
 - Change fields with `setField()`, attribute assignment, `fill()` with field codes as keys or
   `mergeWithFields()`: `$model->fields` is read-only, and changing fields of an object loaded
   without the `fields` column throws a `LogicException`.
 - Concurrent changes of the same field: the last save wins.
 - Class labels in the registry must be unique.
-- Create entity tables with `Schema::createWithLog()` only: it requires all five service columns
-  and fails if one is missing.
+- Create entity tables with `Schema::createWithLog()` only: it requires the `fields`,
+  `updated_at` and `deleted_at` columns and fails if one is missing.
+- Hard deletes (`forceDelete()`) are not logged.
 - Field definitions and lists of values are cached per process. The package flushes the cache
   when fields or lists change and before every queue job and Octane request.
 

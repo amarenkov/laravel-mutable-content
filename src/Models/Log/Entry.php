@@ -6,10 +6,25 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
+use Amarenkov\MutableContent\Domain\Log\Changes;
+use Amarenkov\MutableContent\Domain\Log\LogData;
 use Amarenkov\MutableContent\Helpers\LogHelper;
 
 /**
  * Read-only change log entry, built from LogHelper::query() via fromQuery().
+ *
+ * @property int $log_id
+ * @property int $entity_id
+ * @property string $action
+ * @property ?array $fields_old
+ * @property ?array $fields_new
+ * @property ?array $fields_changed
+ * @property string $compression_status
+ * @property \Illuminate\Support\Carbon $date
+ * @property ?array $data
+ * @property ?int $user_id
+ * @property ?int $transaction_id
+ * @property class-string $object_class
  */
 class Entry extends Model
 {
@@ -39,9 +54,18 @@ class Entry extends Model
         return [
             LogHelper::COLUMN_FIELDS_OLD => 'array',
             LogHelper::COLUMN_FIELDS_NEW => 'array',
-            LogHelper::COLUMN_IS_DELETED => 'boolean',
+            LogHelper::COLUMN_FIELDS_CHANGED => 'array',
             LogHelper::COLUMN_DATE => 'datetime',
+            LogHelper::COLUMN_DATA => 'array',
         ];
+    }
+
+    /**
+     * Dates in the application timezone: the database returns timestamptz in its session timezone.
+     */
+    protected function asDateTime($value)
+    {
+        return parent::asDateTime($value)->setTimezone(config('app.timezone'));
     }
 
     // public
@@ -50,7 +74,26 @@ class Entry extends Model
      */
     public function action(): string
     {
-        return LogHelper::getAction($this->{LogHelper::COLUMN_FIELDS_OLD}, $this->{LogHelper::COLUMN_FIELDS_NEW}, (bool)$this->{LogHelper::COLUMN_IS_DELETED});
+        return (string)$this->{LogHelper::COLUMN_ACTION};
+    }
+
+    public function comment(): ?string
+    {
+        $comment = $this->{LogHelper::COLUMN_DATA}[LogData::COMMENT] ?? null;
+
+        return is_scalar($comment) ? (string)$comment : null;
+    }
+
+    /**
+     * Changed fields, from fields_changed of a compressed entry or from old and new fields.
+     */
+    public function changes(): Changes
+    {
+        if ($this->{LogHelper::COLUMN_COMPRESSION_STATUS} === LogHelper::COMPRESSION_COMPRESSED) {
+            return new Changes($this->{LogHelper::COLUMN_FIELDS_CHANGED} ?? []);
+        }
+
+        return Changes::between($this->{LogHelper::COLUMN_FIELDS_OLD}, $this->{LogHelper::COLUMN_FIELDS_NEW});
     }
 
     /**
@@ -61,7 +104,7 @@ class Entry extends Model
     public function describe(): array
     {
         if ($this->action() === LogHelper::ACTION_EVENT) {
-            return array_filter([(string)$this->{LogHelper::COLUMN_COMMENT}]);
+            return array_filter([LogHelper::describeEvent($this->{LogHelper::COLUMN_DATA}) ?? (string)$this->comment()]);
         }
 
         return $this->describeChanges();
@@ -74,6 +117,6 @@ class Entry extends Model
      */
     public function describeChanges(): array
     {
-        return LogHelper::describeChanges($this->{LogHelper::COLUMN_OBJECT_CLASS}, $this->{LogHelper::COLUMN_FIELDS_OLD}, $this->{LogHelper::COLUMN_FIELDS_NEW});
+        return LogHelper::describeChanges($this->{LogHelper::COLUMN_OBJECT_CLASS}, $this->changes());
     }
 }

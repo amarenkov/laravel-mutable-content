@@ -246,7 +246,7 @@ class Lov extends ModelWithFields
                 if ($trashedItem) {
                     unset($trashedItems[$key]);
 
-                    $trashedItem->setUpdatedBy($comment, $userId);
+                    $trashedItem->withLogContext($comment)->user($userId);
                     $trashedItem->restore();
 
                     $restored[] = $trashedItem;
@@ -261,7 +261,7 @@ class Lov extends ModelWithFields
                 $item->{Item::FIELD_LOV_ID} = $this->id;
                 $item->{DomainField::COMMON_CODE_CODE} = $code;
                 $item->{DomainField::COMMON_CODE_LABEL} = $label;
-                $item->setUpdatedByIfDirty($comment, $userId);
+                $item->withLogContext($comment)->user($userId);
                 $item->save();
 
                 $created[] = $item;

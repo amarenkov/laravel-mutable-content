@@ -290,13 +290,13 @@ class ModelWithFieldsTest extends FeatureTestCase
         DB::table($this->tableOf(Record::class))->where('id', $record->id)->update(['fields' => $this->fieldsWithKey('external', 'sync')]);
 
         $record->quantity = 2;
-        $record->setUpdatedByIfDirty('manual', 8);
+        $record->withLogContext('manual')->user(8);
         $record->save();
 
         $row = DB::table($this->logsTableOf(Record::class))->where('entity_id', $record->id)->orderByDesc('id')->first();
 
         $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'external' => 'sync', 'quantity' => 2], json_decode($row->fields_new, true));
-        $this->assertSame('manual', $row->comment);
+        $this->assertSame('manual', json_decode($row->data, true)['comment']);
     }
 
     public function test_save_over_non_object_fields(): void
