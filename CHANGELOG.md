@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-10
+
 ### Added
 
 - Class types: a class names its type field with `typeField()` (a LOV item or an object reference), and each type has fields of its own besides the class ones. `typeCodeOf()`, `typeCode()`, `getTypeOptions()`, `getTypeScope()` and `getFieldScopesForType()`; the fields of an object are those of its class and of its type.
@@ -149,7 +151,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.4.0...v0.5.0
