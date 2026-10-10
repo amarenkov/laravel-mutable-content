@@ -41,6 +41,9 @@ class Record extends ModelWithFields
     #[CFAType(Type::TYPE_DATE), CFALabel('Due date')]
     public const FIELD_DUE_DATE = 'due_date';
 
+    #[CFAType(Type::TYPE_DATETIME), CFALabel('Started at')]
+    public const FIELD_STARTED_AT = 'started_at';
+
     #[CFAType(Type::TYPE_LOV_ITEM), CFALabel('Status'), CFALovCode(RecordStatus::CODE)]
     public const FIELD_STATUS = 'status';
 

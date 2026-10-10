@@ -14,10 +14,10 @@ class PostgresGrammar
         $column = $command->get('column');
         $type = $command->get('type');
 
-        $expression = $command->get('expression') ?: '(fields ->> \''.$column.'\')::'.$type;
+        $expression = $command->get('expression') ?: '('.$grammar->wrap('fields').' ->> \''.$column.'\')::'.$type;
 
         return "
-            ALTER TABLE {$blueprint->getTable()} ADD COLUMN {$column} {$type} GENERATED ALWAYS AS (
+            ALTER TABLE {$grammar->wrapTable($blueprint)} ADD COLUMN {$grammar->wrap($column)} {$type} GENERATED ALWAYS AS (
                 {$expression}
             ) STORED
         ";

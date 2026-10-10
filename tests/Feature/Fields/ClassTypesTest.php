@@ -163,4 +163,9 @@ class ClassTypesTest extends FeatureTestCase
 
         $this->assertSame('Open and click', $bug->fresh()->{Ticket::FIELD_STEPS});
     }
+
+    public function test_reserved_word_is_extracted_to_a_column(): void
+    {
+        $this->assertArrayHasKey('from', Ticket::getExtractedFields());
+    }
 }

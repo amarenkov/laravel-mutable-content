@@ -33,6 +33,8 @@ return new class extends Migration
             $table->fieldsBase();
             $table->fieldsUpdatedAt();
             $table->softDeletes();
+
+            $table->fieldExtract('from')->type('varchar(20)');
         });
     }
 };

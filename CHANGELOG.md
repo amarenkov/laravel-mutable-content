@@ -7,6 +7,14 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `datetime` field type (`Type::TYPE_DATETIME`, «Date and time»): stored in UTC as `ModelWithFields::DATETIME_FORMAT` (`2026-10-10T09:00:00Z`), so the values sort and compare as strings; a date object or a parsable string (in the application timezone unless it has its own) is converted on write (`toDateTimeValue()`), `getDateTime()` reads it in the application timezone, `whereField()` compares moments. Run `LovsSeeder` to add the type to the field type LOV.
+
+### Fixed
+
+- `fieldExtract()` on PostgreSQL quotes the table and column names, so a field named like a reserved word (`from`, `to`) can be extracted.
+
 ## [0.7.1] - 2026-10-10
 
 ### Added

@@ -64,6 +64,11 @@ class ModelWithFields extends Model
 
     public const WHERE_FIELD_OPERATORS = ['=', '<>', '!=', '<', '<=', '>', '>='];
 
+    /**
+     * Storage format of a date and time field: UTC, so the values sort and compare as strings.
+     */
+    public const DATETIME_FORMAT = 'Y-m-d\\TH:i:s\\Z';
+
     protected const NUMERIC_FIELD_TYPES = [
         FieldType::TYPE_INT,
         FieldType::TYPE_FLOAT,
@@ -208,6 +213,26 @@ class ModelWithFields extends Model
         }
 
         return [];
+    }
+
+    /**
+     * Date and time field value: a date object or a parsable string, the latter in the application timezone unless it has its own, turned into DATETIME_FORMAT. Other values are kept for the validation to reject.
+     */
+    public static function toDateTimeValue(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->utc()->format(self::DATETIME_FORMAT);
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return $value === '' ? null : $value;
+        }
+
+        try {
+            return Carbon::parse($value, config('app.timezone'))->utc()->format(self::DATETIME_FORMAT);
+        } catch (Throwable) {
+            return $value;
+        }
     }
 
     public static function getTypeScope(string $typeCode): string
@@ -439,6 +464,10 @@ class ModelWithFields extends Model
 
         if ($field && $field->fieldType === FieldType::TYPE_DATE && $value instanceof DateTimeInterface) {
             $value = $value->format('Y-m-d');
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
+            $value = static::toDateTimeValue($value);
         }
 
         return $value;
@@ -692,7 +721,9 @@ class ModelWithFields extends Model
             $value = $value->toFieldValue();
         }
 
-        if ($value instanceof DateTimeInterface) {
+        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
+            $value = static::toDateTimeValue($value);
+        } elseif ($value instanceof DateTimeInterface) {
             $value = $value->format('Y-m-d');
         }
 
@@ -807,6 +838,19 @@ class ModelWithFields extends Model
     public function getVolume($name): ?Volume
     {
         return Volume::fromFieldValue($this->getField($name));
+    }
+
+    public function getDateTime($name): ?Carbon
+    {
+        $value = $this->getField($name);
+
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        $date = Carbon::createFromFormat(self::DATETIME_FORMAT, $value, 'UTC');
+
+        return $date ? $date->setTimezone(config('app.timezone')) : null;
     }
 
     public function getDate($name): ?Carbon

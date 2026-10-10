@@ -81,6 +81,10 @@ class RuleHelper
                     $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
                     break;
 
+                case FieldType::TYPE_DATETIME:
+                    $rules[] = 'date';
+                    break;
+
                 case FieldType::TYPE_DATE:
                     $rules[] = 'date_format:Y-m-d';
                     break;
