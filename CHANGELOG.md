@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-10
+
 ### Added
 
 - `whereField()` and `orWhereField()` scopes: a field compared by its type, numbers and measurements as numbers, value objects in base units, on the extracted column when there is one.
@@ -113,7 +115,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.3.1...v0.4.0
