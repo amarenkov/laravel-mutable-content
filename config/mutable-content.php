@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'timezone' => env('MUTABLE_CONTENT_TIMEZONE'),
+
     'log' => [
         'compress' => [
             'schedule' => env('MUTABLE_CONTENT_LOG_COMPRESS_SCHEDULE', '* * * * *'),

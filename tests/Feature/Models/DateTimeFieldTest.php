@@ -16,7 +16,7 @@ class DateTimeFieldTest extends FeatureTestCase
     {
         parent::defineEnvironment($app);
 
-        $app['config']->set('app.timezone', 'Europe/Moscow');
+        $app['config']->set('mutable-content.timezone', 'Europe/Moscow');
     }
 
     protected function makeRecord(string $code, mixed $startedAt): Record
@@ -72,5 +72,12 @@ class DateTimeFieldTest extends FeatureTestCase
 
         $this->assertTrue(Validator::make([Record::FIELD_STARTED_AT => '2026-10-10 12:00'], [Record::FIELD_STARTED_AT => $rules[Record::FIELD_STARTED_AT]])->passes());
         $this->assertFalse(Validator::make([Record::FIELD_STARTED_AT => 'soon'], [Record::FIELD_STARTED_AT => $rules[Record::FIELD_STARTED_AT]])->passes());
+    }
+
+    public function test_storage_does_not_depend_on_the_application_timezone(): void
+    {
+        $this->assertSame('UTC', config('app.timezone'));
+        $this->assertSame('Europe/Moscow', Record::displayTimezone());
+        $this->assertSame('2026-10-10T09:00:00Z', $this->makeRecord('a', '2026-10-10 12:00')->fresh()->{Record::FIELD_STARTED_AT});
     }
 }

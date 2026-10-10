@@ -9,6 +9,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Amarenkov\MutableContent\Domain\Log\Changes;
 use Amarenkov\MutableContent\Domain\Log\LogData;
 use Amarenkov\MutableContent\Helpers\LogHelper;
+use Amarenkov\MutableContent\Models\ModelWithFields;
 
 /**
  * Read-only change log entry, built from LogHelper::query() via fromQuery().
@@ -65,7 +66,7 @@ class Entry extends Model
      */
     protected function asDateTime($value)
     {
-        return parent::asDateTime($value)->setTimezone(config('app.timezone'));
+        return parent::asDateTime($value)->setTimezone(ModelWithFields::displayTimezone());
     }
 
     // public

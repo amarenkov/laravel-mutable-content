@@ -216,7 +216,15 @@ class ModelWithFields extends Model
     }
 
     /**
-     * Date and time field value: a date object or a parsable string, the latter in the application timezone unless it has its own, turned into DATETIME_FORMAT. Other values are kept for the validation to reject.
+     * Timezone dates and times are entered and shown in (`mutable-content.timezone`, the application one by default); they are stored in UTC.
+     */
+    public static function displayTimezone(): string
+    {
+        return (string)(config('mutable-content.timezone') ?: config('app.timezone'));
+    }
+
+    /**
+     * Date and time field value: a date object or a parsable string, the latter in the display timezone unless it has its own, turned into DATETIME_FORMAT. Other values are kept for the validation to reject.
      */
     public static function toDateTimeValue(mixed $value): mixed
     {
@@ -229,7 +237,7 @@ class ModelWithFields extends Model
         }
 
         try {
-            return Carbon::parse($value, config('app.timezone'))->utc()->format(self::DATETIME_FORMAT);
+            return Carbon::parse($value, static::displayTimezone())->utc()->format(self::DATETIME_FORMAT);
         } catch (Throwable) {
             return $value;
         }
@@ -850,7 +858,7 @@ class ModelWithFields extends Model
 
         $date = Carbon::createFromFormat(self::DATETIME_FORMAT, $value, 'UTC');
 
-        return $date ? $date->setTimezone(config('app.timezone')) : null;
+        return $date ? $date->setTimezone(static::displayTimezone()) : null;
     }
 
     public function getDate($name): ?Carbon

@@ -7,6 +7,14 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `mutable-content.timezone` (`MUTABLE_CONTENT_TIMEZONE`, `ModelWithFields::displayTimezone()`): the timezone dates and times are entered and shown in, the application one by default. Date and time fields are stored in UTC whatever the timezones, so `app.timezone` can stay UTC.
+
+### Changed
+
+- `toDateTimeValue()`, `getDateTime()` and `Entry::date` use the display timezone instead of `app.timezone`.
+
 ## [0.7.2] - 2026-10-10
 
 ### Added
