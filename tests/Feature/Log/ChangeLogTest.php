@@ -679,10 +679,6 @@ class ChangeLogTest extends FeatureTestCase
         $connection = DB::connection();
         $table = $this->tableOf(Record::class);
 
-        if (DatabaseHelper::isMariaDb()) {
-            $connection->unprepared('CREATE TRIGGER `'.$table.'_log_before_update` BEFORE UPDATE ON `'.$table.'` FOR EACH ROW SET NEW.updated_at = NEW.updated_at');
-        }
-
         Builder::createLogTriggers($connection, 'fixtures.records');
         Builder::createLogTriggers($connection, 'fixtures.records');
 

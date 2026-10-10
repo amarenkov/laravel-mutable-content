@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- `Builder::createLogTriggers()` and `dropMariaDbLogTriggers()` no longer drop the `_log_before_insert` and `_log_before_update` triggers of 0.4 on MariaDB. Upgrade to 0.5.0 first.
+
 ## [0.5.0] - 2026-10-09
 
 ### Added

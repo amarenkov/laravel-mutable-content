@@ -119,7 +119,7 @@ class Builder
 
     /**
      * MariaDB has no statement triggers with transition tables: rows are logged one by one.
-     * Existing log triggers of the table, also of earlier versions, are replaced.
+     * Existing log triggers of the table are replaced.
      */
     protected static function createMariaDbLogTriggers(Connection $connection, string $table): void
     {
@@ -189,13 +189,7 @@ class Builder
 
         $table = DatabaseHelper::tableName($table, $connection);
 
-        $triggers = [
-            ...static::mariaDbLogTriggerNames($table),
-            DatabaseHelper::identifier($table, 'log_before_insert'),
-            DatabaseHelper::identifier($table, 'log_before_update'),
-        ];
-
-        foreach ($triggers as $trigger) {
+        foreach (static::mariaDbLogTriggerNames($table) as $trigger) {
             $connection->unprepared('DROP TRIGGER IF EXISTS '.$grammar->wrap($trigger));
         }
     }
