@@ -15,7 +15,6 @@ use Amarenkov\MutableContent\Domain\Field\Lov\Type as DomainLovFieldType;
 use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
-use Amarenkov\MutableContent\Models\Field\Usage;
 
 use Amarenkov\MutableContent\Attributes\Class\Label as AttributeClassLabel;
 
@@ -86,19 +85,21 @@ class Item extends ModelWithFields
     }
 
     /**
-     * Field scopes of the LOV items: class scopes plus the LOV scope.
-     *
-     * @return array<string>
+     * The LOV of an item is its type: each LOV has item fields of its own.
      */
-    public static function getFieldScopesForLov(?string $lovCode): array
+    public static function typeField(): ?string
     {
-        $scopes = static::getFieldScopes();
+        return self::FIELD_LOV_ID;
+    }
 
-        if ($lovCode !== null && $lovCode !== '') {
-            $scopes[] = Usage::makeScope(Usage::CODE_LOV_CODE, $lovCode);
-        }
+    public static function typeCodeOf(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : app(LovRegistry::class)->getLovCodeById($value);
+    }
 
-        return $scopes;
+    public static function getTypeOptions(): array
+    {
+        return array_map('strval', app(LovRegistry::class)->getLovsOptions() ?? []);
     }
 
     protected static function booted(): void
@@ -111,13 +112,6 @@ class Item extends ModelWithFields
     }
 
     // public
-    public function fieldScopes(): array
-    {
-        $lovId = $this->getField(self::FIELD_LOV_ID);
-
-        return static::getFieldScopesForLov($lovId === null ? null : app(LovRegistry::class)->getLovCodeById($lovId));
-    }
-
     public function lov(): BelongsTo
     {
         return $this->belongsTo(Lov::class, self::FIELD_LOV_ID);

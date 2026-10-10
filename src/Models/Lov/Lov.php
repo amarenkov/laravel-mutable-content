@@ -100,7 +100,7 @@ class Lov extends ModelWithFields
             return [];
         }
 
-        $scope = Usage::makeScope(Usage::CODE_LOV_CODE, $lovCode);
+        $scope = Item::getTypeScope($lovCode);
 
         $result = [];
 
@@ -167,7 +167,7 @@ class Lov extends ModelWithFields
         return Field::query()->where(function (Builder $query) use ($code) {
             $query->where('fields->'.DomainField::CODE_LOV_CODE, $code)
                 ->orWhereHas('usages', function (Builder $query) use ($code) {
-                    $query->where(Usage::CODE_SCOPE, Usage::makeScope(Usage::CODE_LOV_CODE, $code));
+                    $query->where(Usage::CODE_SCOPE, Item::getTypeScope($code));
                 });
         });
     }

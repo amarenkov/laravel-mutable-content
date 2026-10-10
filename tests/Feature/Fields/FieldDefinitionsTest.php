@@ -131,13 +131,25 @@ class FieldDefinitionsTest extends FeatureTestCase
         $this->bind($field, Record::class);
     }
 
-    public function test_usage_needs_exactly_one_target(): void
+    public function test_usage_needs_a_class(): void
+    {
+        $field = $this->makeField('extra', Type::TYPE_STRING, 'Extra');
+
+        $usage = new Usage();
+        $usage->fill([Usage::FIELD_FIELD_ID => $field->id]);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $usage->save();
+    }
+
+    public function test_class_without_types_rejects_a_type(): void
     {
         $field = $this->makeField('extra', Type::TYPE_STRING, 'Extra');
 
         $this->expectException(InvalidArgumentException::class);
 
-        $this->bind($field, Record::class, [Usage::CODE_LOV_CODE => 'record_status']);
+        $this->bind($field, Record::class, [Usage::CODE_TYPE_CODE => 'record_status']);
     }
 
     public function test_system_type_is_only_for_code_fields(): void

@@ -19,7 +19,6 @@ use Amarenkov\MutableContent\Domain\MutableClassRegistry;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
-use Amarenkov\MutableContent\Models\Lov\Item as LovItem;
 
 use Amarenkov\MutableContent\Attributes\Class\Label as AttributeClassLabel;
 
@@ -48,15 +47,15 @@ class Usage extends ModelWithFields
     #[CFAType(DomainLovFieldType::TYPE_LOV_ITEM), CFALabel('Mutable class'), CFAIsImmutableForSystemObjects, CFALovCode(MutableClassRegistry::LOV_CODE)]
     const CODE_MUTABLE_CLASS = 'mutable_class';
 
-    #[CFAType(DomainLovFieldType::TYPE_LOV), CFALabel('LOV'), CFAIsImmutableForSystemObjects]
-    const CODE_LOV_CODE = DomainField::CODE_LOV_CODE;
+    #[CFAType(DomainLovFieldType::TYPE_STRING), CFALabel('Type'), CFAIsImmutableForSystemObjects]
+    const CODE_TYPE_CODE = 'type_code';
 
     #[CFAType(DomainLovFieldType::TYPE_SYSTEM), CFALabel('Scope'), CFAIsImmutable]
     const CODE_SCOPE = DomainFieldUsage::CODE_SCOPE;
 
     const SCOPE_SEPARATOR = ':';
 
-    const LOV_MUTABLE_CLASS = LovItem::class;
+    const TYPE_SEPARATOR = '|';
 
     #[CFAType(DomainLovFieldType::TYPE_BOOL), CFALabel('Required'), CFAIsImmutableForSystemObjects]
     const CODE_IS_REQUIRED = DomainFieldUsage::CODE_IS_REQUIRED;
@@ -84,6 +83,14 @@ class Usage extends ModelWithFields
     }
 
     /**
+     * Scope of the fields of the objects of a type of the class (see ModelWithFields::typeField()).
+     */
+    public static function makeTypeScope(string $mutableClass, string $typeCode): string
+    {
+        return static::makeScope(self::CODE_MUTABLE_CLASS, $mutableClass.self::TYPE_SEPARATOR.$typeCode);
+    }
+
+    /**
      * Scope kind and value; the kind is null without a separator.
      *
      * @return array{0: ?string, 1: string}
@@ -98,15 +105,19 @@ class Usage extends ModelWithFields
     protected static function booted(): void
     {
         static::saving(function (Usage $usage) {
-            $hasMutableClass = (string)$usage->{self::CODE_MUTABLE_CLASS} !== '';
-            $hasLovCode = (string)$usage->{self::CODE_LOV_CODE} !== '';
+            $mutableClass = $usage->getMutableClass();
 
-            if ($hasMutableClass === $hasLovCode) {
-                throw new InvalidArgumentException(__('mutable-content::validation.usage_target'));
+            if ($mutableClass === null) {
+                throw new InvalidArgumentException(__('mutable-content::validation.usage_class'));
+            }
+
+            $typeCode = (string)$usage->{self::CODE_TYPE_CODE};
+
+            if ($typeCode !== '' && !array_key_exists($typeCode, static::scopeClass($mutableClass)::getTypeOptions())) {
+                throw new InvalidArgumentException(__('mutable-content::validation.usage_type', ['type' => $typeCode]));
             }
 
             $field = Field::find($usage->{self::FIELD_FIELD_ID});
-            $mutableClass = $usage->getMutableClass();
 
             if ($field && $mutableClass) {
                 $error = FieldCodeHelper::getErrorForClass($field->code(), $mutableClass);
@@ -167,31 +178,41 @@ class Usage extends ModelWithFields
     }
 
     /**
-     * Class the scope belongs to; the LOV item class for a LOV scope.
+     * Class the scope belongs to.
      */
     public static function getScopeMutableClass(string $scope): ?string
     {
-        [$type, $value] = static::parseScope($scope);
+        [$kind, $value] = static::parseScope($scope);
 
-        return match ($type) {
-            self::CODE_MUTABLE_CLASS => $value,
-            self::CODE_LOV_CODE => self::LOV_MUTABLE_CLASS,
-            default => null,
-        };
+        if ($kind !== self::CODE_MUTABLE_CLASS) {
+            return null;
+        }
+
+        return explode(self::TYPE_SEPARATOR, $value, 2)[0];
     }
 
     /**
-     * Class the usage belongs to; the LOV item class for a LOV usage.
+     * Type code of a type scope; null for a class scope.
+     */
+    public static function getScopeTypeCode(string $scope): ?string
+    {
+        [$kind, $value] = static::parseScope($scope);
+
+        if ($kind !== self::CODE_MUTABLE_CLASS) {
+            return null;
+        }
+
+        return explode(self::TYPE_SEPARATOR, $value, 2)[1] ?? null;
+    }
+
+    /**
+     * Class the usage belongs to.
      */
     public function getMutableClass(): ?string
     {
         $mutableClass = $this->{self::CODE_MUTABLE_CLASS};
 
-        if ((string)$mutableClass !== '') {
-            return $mutableClass;
-        }
-
-        return (string)$this->{self::CODE_LOV_CODE} !== '' ? self::LOV_MUTABLE_CLASS : null;
+        return (string)$mutableClass !== '' ? $mutableClass : null;
     }
 
     public function field(): BelongsTo

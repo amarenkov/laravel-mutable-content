@@ -23,7 +23,7 @@ use Amarenkov\MutableContent\Models\ModelWithFields;
 class DefinitionsHelper
 {
     // const
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public const LOVS = 'lovs';
     public const ITEMS = 'items';

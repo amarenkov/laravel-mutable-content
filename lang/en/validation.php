@@ -10,7 +10,8 @@ return [
 
     'field_type_system' => 'The "System" field type is available only for fields declared in code.',
     'field_type_setting' => 'Invalid value ":value" of field type setting ":setting".',
-    'usage_target' => 'A field is bound either to a class or to a LOV — specify exactly one.',
+    'usage_class' => 'Specify the class the field is bound to.',
+    'usage_type' => 'The class has no type :type.',
 
     'field_code' => [
         'format' => 'Field code ":code" must start with a latin letter and contain only lowercase latin letters, digits and underscores.',

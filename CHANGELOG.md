@@ -7,6 +7,40 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Class types: a class names its type field with `typeField()` (a LOV item or an object reference), and each type has fields of its own besides the class ones. `typeCodeOf()`, `typeCode()`, `getTypeOptions()`, `getTypeScope()` and `getFieldScopesForType()`; the fields of an object are those of its class and of its type.
+- `Usage::CODE_TYPE_CODE` (`type_code`): a usage is bound to a class and optionally to one of its types. Type scopes are `mutable_class:<class>|<type code>` (`Usage::makeTypeScope()`, `getScopeMutableClass()`, `getScopeTypeCode()`).
+
+### Changed
+
+- LOV items are a typed class: their type is the LOV (`Item::typeField()` is `lov_id`), and item fields are bound to `Item` with the LOV code as the type, `mutable_class:Amarenkov\MutableContent\Models\Lov\Item|<LOV code>`. `#[ItemField]` works as before.
+- The definitions export format is version 2.
+
+### Removed
+
+- The `lov_code:<code>` scope, the `lov_code` field of a usage (`Usage::CODE_LOV_CODE`), `Usage::LOV_MUTABLE_CLASS` and `Item::getFieldScopesForLov()`; use `Item::getFieldScopesForType()`.
+
+### Upgrading
+
+Move the usages bound to LOVs to the item type and drop the usage of the removed `lov_code` field on `Usage`, then run `FieldsSeeder` to add `type_code`:
+
+```php
+use Amarenkov\MutableContent\Models\Field\Field;
+use Amarenkov\MutableContent\Models\Field\Usage;
+use Amarenkov\MutableContent\Models\Lov\Item;
+
+foreach (Usage::query()->where(Usage::CODE_SCOPE, 'like', 'lov_code:%')->get() as $usage) {
+    $usage->fill([Usage::CODE_MUTABLE_CLASS => Item::class, Usage::CODE_TYPE_CODE => $usage->getField('lov_code'), 'lov_code' => null]);
+    $usage->save();
+}
+
+Usage::query()
+    ->where(Usage::CODE_SCOPE, Usage::getClassScope())
+    ->whereIn(Usage::FIELD_FIELD_ID, Field::query()->where('fields->code', 'lov_code')->select('id'))
+    ->each(fn (Usage $usage) => $usage->delete());
+```
+
 ## [0.6.0] - 2026-10-10
 
 ### Added

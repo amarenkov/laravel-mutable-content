@@ -28,6 +28,7 @@ use Amarenkov\MutableContent\Casts\ReadOnlyArrayObject;
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
 use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
@@ -37,6 +38,7 @@ use Amarenkov\MutableContent\Database\Log\LogEvent;
 
 use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
+use Amarenkov\MutableContent\Helpers\ObjectHelper;
 
 use Amarenkov\MutableContent\Models\Field\Usage as UsageModel;
 use Amarenkov\MutableContent\Models\Log\ModelLogContext;
@@ -96,13 +98,14 @@ class ModelWithFields extends Model
      */
     public static function fieldUsageScope(UsageModel $usage): string
     {
-        $lovCode = $usage->{UsageModel::CODE_LOV_CODE};
+        $mutableClass = (string)$usage->{UsageModel::CODE_MUTABLE_CLASS};
+        $typeCode = $usage->{UsageModel::CODE_TYPE_CODE};
 
-        if ($lovCode !== null && $lovCode !== '') {
-            return UsageModel::makeScope(UsageModel::CODE_LOV_CODE, $lovCode);
+        if ($typeCode !== null && $typeCode !== '') {
+            return UsageModel::makeTypeScope($mutableClass, (string)$typeCode);
         }
 
-        return UsageModel::makeScope(UsageModel::CODE_MUTABLE_CLASS, $usage->{UsageModel::CODE_MUTABLE_CLASS});
+        return UsageModel::makeScope(UsageModel::CODE_MUTABLE_CLASS, $mutableClass);
     }
 
     /**
@@ -110,13 +113,14 @@ class ModelWithFields extends Model
      */
     public static function fillFieldUsageFromScope(UsageModel $usage, string $scope): void
     {
-        [$type, $value] = UsageModel::parseScope($scope);
+        $values = [
+            UsageModel::CODE_MUTABLE_CLASS => UsageModel::getScopeMutableClass($scope),
+            UsageModel::CODE_TYPE_CODE => UsageModel::getScopeTypeCode($scope),
+        ];
 
-        foreach ([UsageModel::CODE_MUTABLE_CLASS, UsageModel::CODE_LOV_CODE] as $code) {
-            $codeValue = $type === $code ? $value : null;
-
-            if ($usage->{$code} !== $codeValue) {
-                $usage->{$code} = $codeValue;
+        foreach ($values as $code => $value) {
+            if ($usage->{$code} !== $value) {
+                $usage->{$code} = $value;
             }
         }
     }
@@ -134,6 +138,96 @@ class ModelWithFields extends Model
     public static function getClassScope(): string
     {
         return UsageModel::makeScope(UsageModel::CODE_MUTABLE_CLASS, static::class);
+    }
+
+    /**
+     * Code of the field holding the object type; each type has fields of its own besides the class ones. Null for a class without types.
+     * The field is a LOV item or an object reference, its value is turned into a code by typeCodeOf().
+     */
+    public static function typeField(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Type code of a type field value: the LOV item code, or the code of the referenced object.
+     */
+    public static function typeCodeOf(mixed $value): ?string
+    {
+        $typeField = static::typeField();
+
+        if ($typeField === null || $value === null || $value === '') {
+            return null;
+        }
+
+        $field = static::getFieldDefinitions([static::getClassScope()])[$typeField] ?? null;
+
+        if ($field && $field->fieldType === FieldType::TYPE_OBJECT && $field->objectClass && !TypeSettings::linksByCode($field)) {
+            $object = $field->objectClass::query()->find(ObjectHelper::toId($value));
+
+            return $object instanceof ModelWithFields && $object->code() !== '' ? $object->code() : null;
+        }
+
+        return is_scalar($value) ? (string)$value : null;
+    }
+
+    /**
+     * Types of the class: type code => label. Empty for a class without types.
+     *
+     * @return array<string, string>
+     */
+    public static function getTypeOptions(): array
+    {
+        $typeField = static::typeField();
+
+        if ($typeField === null) {
+            return [];
+        }
+
+        $field = static::getFieldDefinitions([static::getClassScope()])[$typeField] ?? null;
+
+        if (!$field) {
+            return [];
+        }
+
+        if ($field->fieldType === FieldType::TYPE_LOV_ITEM) {
+            return array_map('strval', app(LovRegistry::class)->getLovItemsOptions($field->lovCode) ?? []);
+        }
+
+        if ($field->fieldType === FieldType::TYPE_OBJECT && $field->objectClass) {
+            $result = [];
+
+            foreach ($field->objectClass::query()->get() as $object) {
+                if ($object instanceof ModelWithFields && $object->code() !== '') {
+                    $result[$object->code()] = ObjectHelper::getTitle($object);
+                }
+            }
+
+            return $result;
+        }
+
+        return [];
+    }
+
+    public static function getTypeScope(string $typeCode): string
+    {
+        return UsageModel::makeTypeScope((string)UsageModel::getScopeMutableClass(static::getClassScope()), $typeCode);
+    }
+
+    /**
+     * Usage scopes of the objects of a type: the class ones plus the type one.
+     *
+     * @return array<string>
+     */
+    public static function getFieldScopesForType(?string $typeCode): array
+    {
+        $scopes = static::getFieldScopes();
+
+        if ($typeCode !== null && $typeCode !== '') {
+            $scopes[] = static::getTypeScope($typeCode);
+        }
+
+        return $scopes;
     }
 
     /**
@@ -551,7 +645,19 @@ class ModelWithFields extends Model
      */
     public function fieldScopes(): array
     {
-        return static::getFieldScopes();
+        $typeField = static::typeField();
+
+        return $typeField === null ? static::getFieldScopes() : static::getFieldScopesForType($this->typeCode());
+    }
+
+    /**
+     * Type code of this object, see typeField().
+     */
+    public function typeCode(): ?string
+    {
+        $typeField = static::typeField();
+
+        return $typeField === null ? null : static::typeCodeOf($this->getField($typeField));
     }
 
     public function fieldDefinitions(): array

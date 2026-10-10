@@ -28,5 +28,11 @@ return new class extends Migration
             $table->fieldExtract('owner_id')->type('int');
             $table->unique('code');
         });
+
+        Schema::createWithLog('fixtures.tickets', function (Blueprint $table) {
+            $table->fieldsBase();
+            $table->fieldsUpdatedAt();
+            $table->softDeletes();
+        });
     }
 };
