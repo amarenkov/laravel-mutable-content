@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `#[ForType('code')]` (`Attributes\FieldAttr\Common\ForType`): a field declared in code is bound to one type of the class instead of the whole class.
+
 ## [0.7.0] - 2026-10-10
 
 ### Added

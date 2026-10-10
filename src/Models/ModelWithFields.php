@@ -31,6 +31,7 @@ use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
+use Amarenkov\MutableContent\Attributes\FieldAttr\Common\ForType as AttributeForType;
 use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
 
 use Amarenkov\MutableContent\Database\Log\LogContext;
@@ -304,7 +305,13 @@ class ModelWithFields extends Model
             $attrs = FieldAttr::collect($reflectionConstant);
 
             if ($attrs) {
-                $field = FieldAttr::buildDomainField(static::class, $reflectionConstant->getValue(), $attrs);
+                $typeCode = $attrs[AttributeForType::CODE] ?? null;
+
+                if ($typeCode !== null && static::typeField() === null) {
+                    throw new LogicException($reflectionConstant->getValue().' field of '.static::class.' is bound to a type, but the class has no type field');
+                }
+
+                $field = FieldAttr::buildDomainField(static::class, $reflectionConstant->getValue(), $attrs, $typeCode !== null ? static::getTypeScope($typeCode) : null);
 
                 if (@$result[$field->code]) {
                     throw new LogicException($field->code.' field is already in class '.static::class.' fields list');

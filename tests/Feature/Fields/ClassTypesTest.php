@@ -147,4 +147,20 @@ class ClassTypesTest extends FeatureTestCase
         $this->assertSame(Ticket::class, $usage->{Usage::CODE_MUTABLE_CLASS});
         $this->assertSame(TicketKind::FEATURE, $usage->{Usage::CODE_TYPE_CODE});
     }
+
+    public function test_code_field_bound_to_a_type(): void
+    {
+        $this->assertArrayNotHasKey(Ticket::FIELD_STEPS, Ticket::getFieldDefinitions());
+        $this->assertArrayHasKey(Ticket::FIELD_STEPS, Ticket::getFieldDefinitions(Ticket::getFieldScopesForType(TicketKind::BUG)));
+        $this->assertArrayNotHasKey(Ticket::FIELD_STEPS, Ticket::getFieldDefinitions(Ticket::getFieldScopesForType(TicketKind::FEATURE)));
+
+        $field = Field::where('fields->code', Ticket::FIELD_STEPS)->first();
+
+        $this->assertTrue($field->isSystem());
+        $this->assertSame([Ticket::getTypeScope(TicketKind::BUG)], $field->usages()->pluck('scope')->all());
+
+        $bug = $this->makeTicket(TicketKind::BUG, [Ticket::FIELD_STEPS => 'Open and click']);
+
+        $this->assertSame('Open and click', $bug->fresh()->{Ticket::FIELD_STEPS});
+    }
 }
