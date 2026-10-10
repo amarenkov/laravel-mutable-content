@@ -1,0 +1,25 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got instead, with the error message if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: A model, a migration or a test that shows the problem.
+      render: php
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Package, PHP, Laravel and the database (PostgreSQL or MariaDB) versions.
+      placeholder: 0.5.1, PHP 8.4.12, Laravel 13.2, PostgreSQL 17
+    validations:
+      required: true
