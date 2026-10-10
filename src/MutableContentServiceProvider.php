@@ -14,6 +14,9 @@ use Illuminate\Database\Events\TransactionRolledBack;
 
 use Amarenkov\MutableContent\Console\CompressLogCommand;
 use Amarenkov\MutableContent\Console\PruneLogCommand;
+use Amarenkov\MutableContent\Console\InstallCommand;
+use Amarenkov\MutableContent\Console\ExportDefinitionsCommand;
+use Amarenkov\MutableContent\Console\ImportDefinitionsCommand;
 
 use Amarenkov\MutableContent\Macros\Database\Schema\Blueprint as DatabaseSchemaBlueprintMacros;
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as DatabaseSchemaBuilderMacros;
@@ -133,6 +136,9 @@ class MutableContentServiceProvider extends ServiceProvider
             $this->commands([
                 CompressLogCommand::class,
                 PruneLogCommand::class,
+                InstallCommand::class,
+                ExportDefinitionsCommand::class,
+                ImportDefinitionsCommand::class,
             ]);
 
             $this->scheduleLogCompression();

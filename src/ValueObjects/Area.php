@@ -6,6 +6,8 @@ use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 
+use Amarenkov\MutableContent\Helpers\NumberHelper;
+
 /**
  * Area in square meters.
  */
@@ -228,17 +230,13 @@ final readonly class Area implements FieldValue, HasUnits, JsonSerializable, Str
     /**
      * Format without trailing zeros.
      */
-    public function format(?int $decimals = null, string $decimalSeparator = ',', string $thousandsSeparator = ' ', ?string $unit = null): string
+    public function format(?int $decimals = null, ?string $decimalSeparator = null, ?string $thousandsSeparator = null, ?string $unit = null): string
     {
         $unit ??= self::UNIT_SQUARE_METER;
         $value = $this->toUnit($unit);
         $decimals ??= self::UNIT_FORMAT_DECIMALS[$unit];
 
-        $formatted = number_format($value, $decimals, $decimalSeparator, $thousandsSeparator);
-
-        if ($decimals > 0) {
-            $formatted = rtrim(rtrim($formatted, '0'), $decimalSeparator);
-        }
+        $formatted = NumberHelper::format($value, $decimals, $decimalSeparator, $thousandsSeparator);
 
         return $formatted.' '.self::unitLabel($unit);
     }

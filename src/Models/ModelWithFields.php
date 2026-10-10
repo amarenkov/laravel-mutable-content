@@ -4,6 +4,7 @@ namespace Amarenkov\MutableContent\Models;
 
 use ArrayAccess;
 use DateTimeInterface;
+use InvalidArgumentException;
 use LogicException;
 use Throwable;
 
@@ -26,6 +27,7 @@ use Amarenkov\MutableContent\Casts\ReadOnlyArrayObject;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
+use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
 use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
@@ -57,12 +59,25 @@ class ModelWithFields extends Model
 
     public const FIELDS_PATH_PREFIX = 'fields->';
 
+    public const WHERE_FIELD_OPERATORS = ['=', '<>', '!=', '<', '<=', '>', '>='];
+
+    protected const NUMERIC_FIELD_TYPES = [
+        FieldType::TYPE_INT,
+        FieldType::TYPE_FLOAT,
+        FieldType::TYPE_WEIGHT,
+        FieldType::TYPE_DENSITY,
+        FieldType::TYPE_SURFACE_DENSITY,
+        FieldType::TYPE_LENGTH,
+        FieldType::TYPE_AREA,
+        FieldType::TYPE_VOLUME,
+    ];
+
     // static
     protected static array|bool|null $fieldDefinitions = false;
 
     protected static array $fieldDefinitionsCachedIn = [];
 
-    protected static array $fieldMaxLengths = [];
+    protected static array $extractedFields = [];
 
     /**
      * Reset cached field definitions of all classes.
@@ -132,27 +147,45 @@ class ModelWithFields extends Model
     }
 
     /**
+     * Fields extracted to generated columns by fieldExtract(): code => column type.
+     *
+     * @return array<string, string>
+     */
+    public static function getExtractedFields(): array
+    {
+        if (!isset(self::$extractedFields[static::class])) {
+            $model = new static();
+
+            $result = [];
+
+            foreach ($model->getConnection()->getSchemaBuilder()->getColumns($model->getTable()) as $column) {
+                if ($column['generation'] !== null) {
+                    $result[$column['name']] = $column['type'];
+                }
+            }
+
+            self::$extractedFields[static::class] = $result;
+        }
+
+        return self::$extractedFields[static::class];
+    }
+
+    /**
      * Max lengths of fields extracted to varchar(N) columns: code => N.
      *
      * @return array<string, int>
      */
     public static function getFieldMaxLengths(): array
     {
-        if (!isset(self::$fieldMaxLengths[static::class])) {
-            $model = new static();
+        $result = [];
 
-            $result = [];
-
-            foreach ($model->getConnection()->getSchemaBuilder()->getColumns($model->getTable()) as $column) {
-                if ($column['generation'] !== null && preg_match('/^(?:character varying|character|varchar|char)\((\d+)\)$/', $column['type'], $matches)) {
-                    $result[$column['name']] = (int)$matches[1];
-                }
+        foreach (static::getExtractedFields() as $code => $type) {
+            if (preg_match('/^(?:character varying|character|varchar|char)\((\d+)\)$/', $type, $matches)) {
+                $result[$code] = (int)$matches[1];
             }
-
-            self::$fieldMaxLengths[static::class] = $result;
         }
 
-        return self::$fieldMaxLengths[static::class];
+        return $result;
     }
 
     public static function getSystemFields()
@@ -263,6 +296,11 @@ class ModelWithFields extends Model
     }
 
     // protected
+    protected function fieldColumn(EloquentBuilder $query, string $code): string
+    {
+        return $query->qualifyColumn(self::FIELDS_COLUMN).'->'.$code;
+    }
+
     protected ?ModelLogContext $pendingLogContext = null;
 
     protected function casts(): array
@@ -519,6 +557,66 @@ class ModelWithFields extends Model
     public function fieldDefinitions(): array
     {
         return static::getFieldDefinitions($this->fieldScopes());
+    }
+
+    /**
+     * Where on a field value typed by its definition: numbers and measurements compare as numbers, value objects in base
+     * units, dates as Y-m-d. A field extracted to a column is compared on the column.
+     */
+    public function scopeWhereField(EloquentBuilder $query, string $code, mixed $operator, mixed $value = null, string $boolean = 'and'): EloquentBuilder
+    {
+        if (func_num_args() === 3) {
+            [$value, $operator] = [$operator, '='];
+        }
+
+        if (!in_array($operator, self::WHERE_FIELD_OPERATORS, true)) {
+            throw new InvalidArgumentException('Unsupported operator '.$operator.' for field '.$code);
+        }
+
+        $field = static::getFieldDefinitions()[$code] ?? null;
+
+        if ($value instanceof FieldValue) {
+            $value = $value->toFieldValue();
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format('Y-m-d');
+        }
+
+        if ($value === null) {
+            return match ($operator) {
+                '=' => $query->whereNull($this->fieldColumn($query, $code), $boolean),
+                '<>', '!=' => $query->whereNotNull($this->fieldColumn($query, $code), $boolean),
+                default => throw new InvalidArgumentException('Operator '.$operator.' cannot compare field '.$code.' with null'),
+            };
+        }
+
+        if (isset(static::getExtractedFields()[$code])) {
+            return $query->where($query->qualifyColumn($code), $operator, $value, $boolean);
+        }
+
+        if ($field && (in_array($field->fieldType, self::NUMERIC_FIELD_TYPES, true) || ($field->fieldType === FieldType::TYPE_OBJECT && !TypeSettings::linksByCode($field)))) {
+            $grammar = $query->getQuery()->getGrammar();
+            $path = $grammar->wrap($this->fieldColumn($query, $code));
+            $number = DatabaseHelper::isMariaDb($this->getConnection()) ? 'cast('.$path.' as double)' : '('.$path.')::numeric';
+
+            return $query->whereRaw($number.' '.$operator.' ?', [$value], $boolean);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_BOOL) {
+            $value = (bool)$value;
+        }
+
+        return $query->where($this->fieldColumn($query, $code), $operator, $value, $boolean);
+    }
+
+    public function scopeOrWhereField(EloquentBuilder $query, string $code, mixed $operator, mixed $value = null): EloquentBuilder
+    {
+        if (func_num_args() === 3) {
+            [$value, $operator] = [$operator, '='];
+        }
+
+        return $this->scopeWhereField($query, $code, $operator, $value, 'or');
     }
 
     public function attributesToArray()

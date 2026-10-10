@@ -75,7 +75,8 @@ class DensityTest extends TestCase
 
     public function test_format(): void
     {
-        $this->assertSame('7 850 kg/m³', Density::fromKilogramsPerCubicMeter(7850)->format());
-        $this->assertSame('1,25 kg/m²', SurfaceDensity::fromKilogramsPerSquareMeter(1.25)->format());
+        $this->assertSame('7,850 kg/m³', Density::fromKilogramsPerCubicMeter(7850)->format());
+        $this->assertSame('1.25 kg/m²', SurfaceDensity::fromKilogramsPerSquareMeter(1.25)->format());
+        $this->assertSame('7 850 kg/m³', Density::fromKilogramsPerCubicMeter(7850)->format(thousandsSeparator: ' '));
     }
 }

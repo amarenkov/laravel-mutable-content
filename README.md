@@ -2,16 +2,74 @@
 
 [![tests](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml/badge.svg)](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml)
 [![Packagist](https://img.shields.io/packagist/v/amarenkov/laravel-mutable-content)](https://packagist.org/packages/amarenkov/laravel-mutable-content)
-![coverage](https://img.shields.io/badge/coverage-77%25-yellowgreen)
+![coverage](https://img.shields.io/badge/coverage-78%25-yellowgreen)
 
 Laravel models whose set of fields is not fixed by the database schema. Values live in a single
 JSON column (`jsonb` on PostgreSQL), and field definitions come from two sources: PHP attributes in code and records
 in reference tables that an administrator edits by hand.
 
 One field definition feeds everything at once: Eloquent, validation rules, the admin panel
-([`-filament`](https://github.com/amarenkov/laravel-mutable-content-filament)) and the OpenAPI
-docs ([`-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble)). Add a field,
-and it shows up in forms, tables, validation and API docs.
+([`-filament`](https://github.com/amarenkov/laravel-mutable-content-filament)), the user-facing
+screens ([`-daisyui`](https://github.com/amarenkov/laravel-mutable-content-daisyui)) and the
+OpenAPI docs ([`-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble)). Add a
+field, and it shows up in forms, tables, validation and API docs.
+
+## At a glance
+
+```php
+#[Table('catalog.bicycles')]
+#[ClassLabel('Bicycle')]
+#[FieldCode, FieldLabel]
+class Bicycle extends ModelWithFields
+{
+    #[CFAType(Type::TYPE_LOV_ITEM), CFALabel('Type'), CFALovCode(BikeType::CODE), CFAIsRequired]
+    public const FIELD_TYPE = 'type';
+
+    #[CFAType(Type::TYPE_WEIGHT), CFALabel('Weight')]
+    public const FIELD_WEIGHT = 'weight';
+
+    protected static array|bool|null $fieldDefinitions = null;
+}
+
+$bike = new Bicycle();
+$bike->mergeWithFields(['code' => 'AERO-7', 'label' => 'Aero 7', 'type' => BikeType::ROAD,
+    'weight' => Weight::fromKilograms(7.4)]);
+$bike->withLogContext('Imported')->user($user->id)->save();
+
+// "gears" was added by an administrator in the admin panel: no migration, no release
+$bike->gears = 24;
+$bike->weight = Weight::fromKilograms(7.2);
+$bike->withLogContext('Weighed without pedals')->user($user->id)->save();
+
+RuleHelper::getValidationRules(Bicycle::class);
+// ['type' => [InLov, 'required'], 'weight' => ['nullable', 'numeric', 'gt:0'],
+//  'gears' => ['nullable', 'integer'], ...]
+```
+
+The change log, written by database triggers, now holds both saves:
+
+```text
+created  Imported                Code: AERO-7; Type: Road; Label: Aero 7; Weight: 7.4 kg
+updated  Weighed without pedals  Weight: 7.4 kg → 7.2 kg; Gears: 24
+```
+
+## Screenshots
+
+> **These screens are not part of this package.** It has no user interface of its own: the
+> screenshots show the companion packages
+> [`-filament`](https://github.com/amarenkov/laravel-mutable-content-filament) and
+> [`-daisyui`](https://github.com/amarenkov/laravel-mutable-content-daisyui) on a demo catalog,
+> with forms and tables built from the field definitions above.
+
+**Filament admin panel (`laravel-mutable-content-filament`):** the table and the form come from
+the field definitions; "Gears" and "Color" were added in the admin panel.
+
+![Bicycles in the Filament admin panel](https://raw.githubusercontent.com/amarenkov/laravel-mutable-content-filament/main/art/bicycles.png)
+
+**daisyUI screens (`laravel-mutable-content-daisyui`):** the same model in a server-rendered
+Blade and Livewire application.
+
+![Editing a bicycle on the daisyUI screens](https://raw.githubusercontent.com/amarenkov/laravel-mutable-content-daisyui/main/art/edit.png)
 
 ## What it solves
 
@@ -53,6 +111,11 @@ and it shows up in forms, tables, validation and API docs.
 - **Change log tables.** `Schema::createWithLog()` creates a table together with its log table
   in the `logs` schema and the triggers. `LogHelper` and `Models\Log\Entry` read the log back in a
   human-readable form. See [Change log](#change-log).
+- **Typed queries.** `whereField()` compares numbers as numbers and measurements in base units,
+  on the extracted column when there is one. See [Querying fields](#querying-fields).
+- **Definitions between environments.** Fields and lists created in the admin panel are exported
+  to JSON and imported by codes. See
+  [Moving definitions between environments](#moving-definitions-between-environments).
 - **References by code.** An `object` field can store an object code instead of its id
   (`link_by_code`), optionally accepting codes that do not exist yet (`allow_unlisted_codes`).
 
@@ -69,11 +132,23 @@ Use the model's `getTable()` instead of a literal name with a schema in raw quer
 are set by the database, so set the connection `timezone` to the application timezone on
 MariaDB (on PostgreSQL the log date is `timestamptz`).
 
+SQLite and MySQL are not supported: the change log needs triggers and JSON functions of
+PostgreSQL or MariaDB. Run the test suite of your application against one of them too, for
+example a PostgreSQL service in CI, rather than an in-memory SQLite database.
+
 ## Installation
 
 ```bash
 composer require amarenkov/laravel-mutable-content
 
+php artisan mutable-content:install
+```
+
+The command publishes the migrations, migrates and seeds the system lists of values and fields
+(`--config` publishes the config file too, `--no-migrate` only publishes the migrations). The
+same by hand:
+
+```bash
 php artisan vendor:publish --tag=mutable-content-migrations
 php artisan migrate
 
@@ -81,7 +156,8 @@ php artisan db:seed --class="Amarenkov\MutableContent\Database\Seeders\LovsSeede
 php artisan db:seed --class="Amarenkov\MutableContent\Database\Seeders\FieldsSeeder"
 ```
 
-Run the seeders in this order: lists of values first, then fields.
+Run the seeders in this order: lists of values first, then fields. Run them again on deploy:
+they add the fields and lists declared in code since the last run.
 
 ## Quick start
 
@@ -166,6 +242,26 @@ in the admin panel or in code with the `TypeSettings` attribute:
   CFATypeSettings([TypeSettings::LINK_BY_CODE => true, TypeSettings::ALLOW_UNLISTED_CODES => true])]
 const FIELD_TEAM_CODE = 'team_code';
 ```
+
+## Querying fields
+
+`whereField()` and `orWhereField()` compare a field by its type. A plain
+`where('fields->weight', '>', 10)` compares JSON values as text on PostgreSQL, so `9.5` is greater
+than `10` there; `whereField()` casts numbers and measurements, takes value objects in base units
+and dates as `Y-m-d`:
+
+```php
+Bicycle::whereField('weight', '<', Weight::fromKilograms(10))
+    ->whereField('frame_size', '>=', Length::fromCentimeters(54))
+    ->whereField('is_electric', true)
+    ->whereField('type', BikeType::GRAVEL)
+    ->get();
+
+Bicycle::whereField('gears', null)->get(); // the field is not set
+```
+
+A field extracted to a column with `fieldExtract()` is compared on that column, so its index is
+used. The operators are `=`, `<>`, `!=`, `<`, `<=`, `>` and `>=`.
 
 ## Change log
 
@@ -252,6 +348,24 @@ Schedule::command('mutable-content:prune-log --days=1095')->daily();
 Both commands take `--class=` to limit them to some classes (all registered classes by
 default), and the same is available as `LogHelper::compress()` and `LogHelper::prune()`.
 
+## Moving definitions between environments
+
+Fields, their usages, lists of values and items created in the admin panel live in the
+database. Move them, for example from staging to production, as JSON:
+
+```bash
+php artisan mutable-content:export-definitions definitions.json
+
+php artisan mutable-content:import-definitions definitions.json --dry-run
+php artisan mutable-content:import-definitions definitions.json --comment="Release 42"
+```
+
+The export holds only records created in the admin panel: system ones come from the code and
+the seeders. References between records are written as codes, and the import matches records by
+codes: it creates the missing ones and updates the keys present in the file, never touches system
+records and runs in one transaction. Every change lands in the change log with the comment.
+`DefinitionsHelper::export()` and `DefinitionsHelper::import()` do the same in code.
+
 ## Translations
 
 Labels in attributes are passed through `__()` when read, so they can be translation keys or
@@ -284,10 +398,30 @@ the database label wins and is edited in the admin panel.
 - Field definitions and lists of values are cached per process. The package flushes the cache
   when fields or lists change and before every queue job and Octane request.
 
+## Compared to other packages
+
+- **Schemaless attributes** (for example `spatie/laravel-schemaless-attributes`) also keep extra
+  attributes in a JSON column, but without definitions: no types, labels, validation rules or
+  admin screens, and any key can be written. Here every field is declared, in code or in the
+  admin panel, and the declaration drives validation, forms and tables.
+- **EAV packages** keep each value in a separate row, so reading a record joins value tables and
+  filtering by a value needs a join per attribute. Here the values are one JSON column of the
+  row, and a field that needs an index or a unique constraint is extracted into a generated
+  column (`fieldExtract()`).
+- **Activity and audit logs** (`spatie/laravel-activitylog`, `owen-it/laravel-auditing`) record
+  changes from Eloquent model events, so query builder updates, mass updates and plain SQL are
+  not recorded. Here the log is written by database triggers, with the author and comment passed
+  through the database session, so every change of the row is recorded.
+
+The trade-off: PostgreSQL or MariaDB only, PHP 8.4 and Laravel 13.
+
 ## Companion packages
 
 - [`amarenkov/laravel-mutable-content-filament`](https://github.com/amarenkov/laravel-mutable-content-filament):
   a Filament 5 admin panel with forms, tables and screens for managing fields and lists of values.
+- [`amarenkov/laravel-mutable-content-daisyui`](https://github.com/amarenkov/laravel-mutable-content-daisyui):
+  server-rendered Blade, Livewire and daisyUI screens with the same forms, tables and management
+  screens.
 - [`amarenkov/laravel-mutable-content-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble):
   OpenAPI docs with field labels and LOV enums in Scramble.
 

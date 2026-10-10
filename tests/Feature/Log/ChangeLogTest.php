@@ -539,7 +539,7 @@ class ChangeLogTest extends FeatureTestCase
     public function test_describe_changes(): void
     {
         $this->assertSame(
-            ['Quantity: 1 → 2', 'Weight: 1,5 kg → empty', 'unknown_field: a → b', 'Status: Draft'],
+            ['Quantity: 1 → 2', 'Weight: 1.5 kg → empty', 'unknown_field: a → b', 'Status: Draft'],
             LogHelper::describeChanges(Record::class, Changes::between(['quantity' => 1, 'weight' => 1.5, 'unknown_field' => 'a'], ['quantity' => 2, 'status' => 'draft', 'unknown_field' => 'b']))
         );
     }

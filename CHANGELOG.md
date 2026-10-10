@@ -7,6 +7,17 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `whereField()` and `orWhereField()` scopes: a field compared by its type, numbers and measurements as numbers, value objects in base units, on the extracted column when there is one.
+- `mutable-content:export-definitions` and `mutable-content:import-definitions` (`DefinitionsHelper`): fields, usages, LOVs and items created in the admin panel moved between environments by their codes.
+- `mutable-content:install`: publishes the migrations, migrates and runs the seeders.
+- `NumberHelper` and `ModelWithFields::getExtractedFields()`.
+
+### Changed
+
+- Value objects format numbers with the separators of the current locale (`mutable-content::units.decimal_separator` and `thousands_separator`): `7.4 kg` in English, `7,4 кг` in Russian. Pass the separators to `format()` to keep a fixed format.
+
 ## [0.5.1] - 2026-10-10
 
 ### Removed

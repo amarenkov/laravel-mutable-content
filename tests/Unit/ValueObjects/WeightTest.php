@@ -99,8 +99,8 @@ class WeightTest extends TestCase
 
     public function test_format(): void
     {
-        $this->assertSame('12.5 kg', Weight::fromKilograms(12.5)->format(decimalSeparator: '.'));
-        $this->assertSame('1 234,567 kg', Weight::fromKilograms(1234.5671)->format());
+        $this->assertSame('12,5 kg', Weight::fromKilograms(12.5)->format(decimalSeparator: ','));
+        $this->assertSame('1,234.567 kg', Weight::fromKilograms(1234.5671)->format());
         $this->assertSame('500 g', Weight::fromKilograms(0.5)->format(unit: Weight::UNIT_GRAM));
         $this->assertSame('3 kg', (string)Weight::fromKilograms(3));
     }
@@ -110,6 +110,7 @@ class WeightTest extends TestCase
         $this->app->setLocale('ru');
 
         $this->assertSame('12,5 кг', Weight::fromKilograms(12.5)->format());
+        $this->assertSame('1 234,567 кг', Weight::fromKilograms(1234.5671)->format());
         $this->assertSame(['g' => 'г', 'kg' => 'кг', 't' => 'т'], Weight::unitOptions());
     }
 }

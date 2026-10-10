@@ -6,6 +6,8 @@ use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 
+use Amarenkov\MutableContent\Helpers\NumberHelper;
+
 /**
  * Density in kg/m³, not negative. Zero is allowed by the allow_zero type setting.
  */
@@ -169,13 +171,9 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
     /**
      * Format in kg/m³ without trailing zeros.
      */
-    public function format(int $decimals = 3, string $decimalSeparator = ',', string $thousandsSeparator = ' '): string
+    public function format(int $decimals = 3, ?string $decimalSeparator = null, ?string $thousandsSeparator = null): string
     {
-        $formatted = number_format($this->kilogramsPerCubicMeter, $decimals, $decimalSeparator, $thousandsSeparator);
-
-        if ($decimals > 0) {
-            $formatted = rtrim(rtrim($formatted, '0'), $decimalSeparator);
-        }
+        $formatted = NumberHelper::format($this->kilogramsPerCubicMeter, $decimals, $decimalSeparator, $thousandsSeparator);
 
         return $formatted.' '.__('mutable-content::units.kg_per_m3');
     }

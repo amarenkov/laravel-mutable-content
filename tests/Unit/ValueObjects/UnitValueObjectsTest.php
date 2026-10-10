@@ -116,9 +116,9 @@ class UnitValueObjectsTest extends TestCase
 
     public function test_format(): void
     {
-        $this->assertSame('12,5 m', Length::fromMeters(12.5)->format());
-        $this->assertSame('3,6 m²', Area::fromSquareMeters(3.6)->format());
-        $this->assertSame('0,045 m³', Volume::fromCubicMeters(0.045)->format());
+        $this->assertSame('12.5 m', Length::fromMeters(12.5)->format());
+        $this->assertSame('3.6 m²', Area::fromSquareMeters(3.6)->format());
+        $this->assertSame('0.045 m³', Volume::fromCubicMeters(0.045)->format());
         $this->assertSame('45 l', Volume::fromCubicMeters(0.045)->format(unit: Volume::UNIT_LITER));
     }
 }

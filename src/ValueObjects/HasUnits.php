@@ -27,5 +27,5 @@ interface HasUnits
 
     public function toUnit(string $unit): float;
 
-    public function format(?int $decimals = null, string $decimalSeparator = ',', string $thousandsSeparator = ' ', ?string $unit = null): string;
+    public function format(?int $decimals = null, ?string $decimalSeparator = null, ?string $thousandsSeparator = null, ?string $unit = null): string;
 }

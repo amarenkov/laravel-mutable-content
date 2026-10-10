@@ -6,6 +6,8 @@ use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 
+use Amarenkov\MutableContent\Helpers\NumberHelper;
+
 /**
  * Surface density in kg/m², not negative. Zero is allowed by the allow_zero type setting.
  */
@@ -161,13 +163,9 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
     /**
      * Format in kg/m² without trailing zeros.
      */
-    public function format(int $decimals = 3, string $decimalSeparator = ',', string $thousandsSeparator = ' '): string
+    public function format(int $decimals = 3, ?string $decimalSeparator = null, ?string $thousandsSeparator = null): string
     {
-        $formatted = number_format($this->kilogramsPerSquareMeter, $decimals, $decimalSeparator, $thousandsSeparator);
-
-        if ($decimals > 0) {
-            $formatted = rtrim(rtrim($formatted, '0'), $decimalSeparator);
-        }
+        $formatted = NumberHelper::format($this->kilogramsPerSquareMeter, $decimals, $decimalSeparator, $thousandsSeparator);
 
         return $formatted.' '.__('mutable-content::units.kg_per_m2');
     }

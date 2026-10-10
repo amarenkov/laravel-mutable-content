@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'decimal_separator' => ',',
+    'thousands_separator' => ' ',
     'cm' => 'см',
     'cm2' => 'см²',
     'cm3' => 'см³',
