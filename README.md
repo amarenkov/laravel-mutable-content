@@ -422,6 +422,9 @@ The trade-off: PostgreSQL or MariaDB only, PHP 8.4 and Laravel 13.
 - [`amarenkov/laravel-mutable-content-daisyui`](https://github.com/amarenkov/laravel-mutable-content-daisyui):
   server-rendered Blade, Livewire and daisyUI screens with the same forms, tables and management
   screens.
+- [`amarenkov/laravel-mutable-content-tasks`](https://github.com/amarenkov/laravel-mutable-content-tasks):
+  a task domain (tasks, participants, time tracking) with services and events, without a user
+  interface. Work in progress.
 - [`amarenkov/laravel-mutable-content-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble):
   OpenAPI docs with field labels and LOV enums in Scramble.
 
