@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-10
+
 ### Added
 
 - `mutable-content.timezone` (`MUTABLE_CONTENT_TIMEZONE`, `ModelWithFields::displayTimezone()`): the timezone dates and times are entered and shown in, the application one by default. Date and time fields are stored in UTC whatever the timezones, so `app.timezone` can stay UTC.
@@ -175,7 +177,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.6.0...v0.7.0
