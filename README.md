@@ -2,6 +2,7 @@
 
 [![tests](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml/badge.svg)](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml)
 [![Packagist](https://img.shields.io/packagist/v/amarenkov/laravel-mutable-content)](https://packagist.org/packages/amarenkov/laravel-mutable-content)
+![coverage](https://img.shields.io/badge/coverage-77%25-yellowgreen)
 
 Laravel models whose set of fields is not fixed by the database schema. Values live in a single
 JSON column (`jsonb` on PostgreSQL), and field definitions come from two sources: PHP attributes in code and records

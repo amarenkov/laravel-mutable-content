@@ -1,6 +1,6 @@
 {
     "name": "amarenkov/laravel-mutable-content",
-    "description": "Flexible content models for Laravel: dynamic JSON fields with a type system, change log and lists of values (LOV).",
+    "description": "Laravel models with user-defined fields: typed JSON fields added without migrations, lists of values, and a trigger-based change log on PostgreSQL and MariaDB.",
     "type": "library",
     "keywords": [
         "laravel",
@@ -11,7 +11,9 @@
         "dynamic-fields",
         "custom-fields",
         "lov",
-        "audit-log"
+        "audit-log",
+        "change-log",
+        "database-triggers"
     ],
     "homepage": "https://github.com/amarenkov/laravel-mutable-content",
     "license": "MIT",
