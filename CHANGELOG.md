@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-10-13
+
 ### Added
 
 - `money` field type (`Type::TYPE_MONEY`, «Money»): `{"amount": 1234.56, "currency": "USD"}`, the amount a JSON number (exact `numeric` in PostgreSQL), the currency a code of the `currency` LOV. `ModelWithFields::getMoney()` returns `ValueObjects\Money`: the amount as a decimal string, bcmath arithmetic (`add`, `subtract`, `negate`, `abs`, `compareTo`) within one currency, `format()` with the currency decimals and symbol. On write an empty amount clears the field and a numeric string becomes a number (`toMoneyValue()`). Validation (`Rules\Money`): a known currency, no more decimals than the currency has.
@@ -201,7 +203,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...HEAD
+[0.7.5]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.1...v0.7.2
