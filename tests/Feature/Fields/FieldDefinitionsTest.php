@@ -4,7 +4,9 @@ namespace Amarenkov\MutableContent\Tests\Feature\Fields;
 
 use InvalidArgumentException;
 
+use Amarenkov\MutableContent\Database\Seeders\FieldsSeeder;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type;
+use Amarenkov\MutableContent\Helpers\RuleHelper;
 use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 use Amarenkov\MutableContent\Models\Field\Field;
 use Amarenkov\MutableContent\Models\Field\Usage;
@@ -186,5 +188,57 @@ class FieldDefinitionsTest extends FeatureTestCase
 
         $this->assertSame('t', TypeSettings::getValue($definition, TypeSettings::DISPLAY_UNIT));
         $this->assertTrue(TypeSettings::allowsZero($definition));
+    }
+
+    public function test_usage_label_overrides_field_label_in_its_class_only(): void
+    {
+        $field = $this->makeField('comment', Type::TYPE_TEXT, 'Comment');
+
+        $this->bind($field, Record::class, ['label' => 'Remark']);
+        $this->bind($field, Owner::class);
+
+        $this->assertSame('Remark', Record::getFieldDefinitions()['comment']->label);
+        $this->assertSame('Remark', RuleHelper::getValidationAttributes(Record::class)['comment']);
+        $this->assertSame('Comment', Owner::getFieldDefinitions()['comment']->label);
+        $this->assertSame('Comment', Field::where('code', 'comment')->first()->label);
+    }
+
+    public function test_code_usage_label_is_seeded_into_its_usage(): void
+    {
+        $field = Field::where('code', 'is_active')->first();
+
+        $this->assertSame('Active', $field->label);
+        $this->assertSame('Enabled', $field->usages()->where('scope', Owner::getClassScope())->first()->label);
+        $this->assertNull($field->usages()->where('scope', Record::getClassScope())->first()->label);
+
+        $this->assertSame('Enabled', Owner::getFieldDefinitions()['is_active']->label);
+        $this->assertSame('Active', Record::getFieldDefinitions()['is_active']->label);
+    }
+
+    public function test_database_usage_label_overrides_code_usage_label_and_survives_seeding(): void
+    {
+        $usage = Field::where('code', 'is_active')->first()->usages()->where('scope', Owner::getClassScope())->first();
+        $usage->label = 'Switched on';
+        $usage->save();
+
+        $this->seed(FieldsSeeder::class);
+
+        $this->assertSame('Switched on', $usage->fresh()->label);
+        $this->assertSame('Switched on', Owner::getFieldDefinitions()['is_active']->label);
+    }
+
+    public function test_cleared_usage_label_falls_back_to_code_usage_label(): void
+    {
+        $usage = Field::where('code', 'is_active')->first()->usages()->where('scope', Owner::getClassScope())->first();
+        $usage->label = null;
+        $usage->save();
+
+        $this->assertSame('Enabled', Owner::getFieldDefinitions()['is_active']->label);
+    }
+
+    public function test_usage_label_field_is_labeled_by_its_usage(): void
+    {
+        $this->assertSame('Label', Field::where('code', 'label')->first()->label);
+        $this->assertSame('Field label', Usage::getFieldDefinitions()['label']->label);
     }
 }

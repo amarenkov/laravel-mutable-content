@@ -243,6 +243,15 @@ in the admin panel or in code with the `TypeSettings` attribute:
 const FIELD_TEAM_CODE = 'team_code';
 ```
 
+A field shared by several classes has one label, but each usage may have a label of its own that
+replaces it in that class (forms, tables, validation messages, API docs). Set it in the admin panel
+or in code with the `UsageLabel` attribute; `FieldsSeeder` copies it into an empty usage label:
+
+```php
+#[CFAType(Type::TYPE_BOOL), CFALabel('Active'), CFAUsageLabel('Enabled')]
+const FIELD_IS_ACTIVE = 'is_active';
+```
+
 ## Querying fields
 
 `whereField()` and `orWhereField()` compare a field by its type. A plain

@@ -27,6 +27,7 @@ use Amarenkov\MutableContent\Attributes\Field\Common\IsSystem as AttributeFieldI
 
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\Type as CFAType;
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\Label as CFALabel;
+use Amarenkov\MutableContent\Attributes\FieldAttr\Common\UsageLabel as CFAUsageLabel;
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\IsImmutable as CFAIsImmutable;
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\LovCode as CFALovCode;
 use Amarenkov\MutableContent\Attributes\FieldAttr\Common\ObjectClass as CFAObjectClass;
@@ -52,6 +53,9 @@ class Usage extends ModelWithFields
 
     #[CFAType(DomainLovFieldType::TYPE_SYSTEM), CFALabel('Scope'), CFAIsImmutable]
     const CODE_SCOPE = DomainFieldUsage::CODE_SCOPE;
+
+    #[CFAType(DomainLovFieldType::TYPE_STRING), CFALabel('Label'), CFAUsageLabel('Field label')]
+    const CODE_LABEL = DomainFieldUsage::CODE_LABEL;
 
     const SCOPE_SEPARATOR = ':';
 
@@ -232,6 +236,7 @@ class Usage extends ModelWithFields
             ->typeSettings($this->field->fields[DomainField::CODE_FIELD_TYPE_SETTINGS] ?? []);
 
         $field->addUsage(new DomainFieldUsage((string)$this->{self::CODE_SCOPE})
+            ->label($this->{self::CODE_LABEL})
             ->isRequired($this->{self::CODE_IS_REQUIRED} ?? false)
             ->isImmutable($this->{self::CODE_IS_IMMUTABLE} ?? false)
             ->isImmutableForSystemObjects($this->{self::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS} ?? false)
@@ -254,6 +259,10 @@ class Usage extends ModelWithFields
         }
         if ($this->{DomainFieldUsage::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS} != $usage->isImmutableForSystemObjects) {
             $this->{DomainFieldUsage::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS} = $usage->isImmutableForSystemObjects;
+        }
+
+        if ($usage->label !== null && $usage->label !== '' && (string)$this->{self::CODE_LABEL} === '') {
+            $this->{self::CODE_LABEL} = $usage->label;
         }
 
         $this->fillFromScope($usage->scope);

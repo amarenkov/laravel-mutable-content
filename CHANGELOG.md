@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Usage label (`label` of a field usage, «Field label»): the label of a field in one class or type, over the label of the field. It reaches everything built from the definitions: forms, tables, validation attributes, API docs, the change log. In code - the `UsageLabel` attribute on the field constant; `FieldsSeeder` copies it into the usage only while the usage label is empty, so a label set in the admin panel stays. With labels in several usages of a definition (an LOV item field), the last scope wins, as with type settings. Run `FieldsSeeder` to add the field to «Field usage».
+
 ## [0.7.3] - 2026-10-10
 
 ### Added

@@ -9,6 +9,8 @@ use ReflectionClassConstant;
 use Amarenkov\MutableContent\Domain\Field\Field as DomainField;
 use Amarenkov\MutableContent\Domain\Field\Usage as DomainFieldUsage;
 
+use Amarenkov\MutableContent\Attributes\FieldAttr\Common\UsageLabel;
+
 #[Attribute(Attribute::TARGET_CLASS_CONSTANT | Attribute::IS_REPEATABLE)]
 class FieldAttr
 {
@@ -46,6 +48,7 @@ class FieldAttr
             ->typeSettings($attrs[DomainField::CODE_FIELD_TYPE_SETTINGS] ?? []);
         
         $field->addUsage(new DomainFieldUsage($scope ?? $class::getClassScope())
+            ->label(isset($attrs[UsageLabel::CODE]) ? __($attrs[UsageLabel::CODE]) : null)
             ->isRequired($attrs[DomainFieldUsage::CODE_IS_REQUIRED] ?? false)
             ->isImmutable($attrs[DomainFieldUsage::CODE_IS_IMMUTABLE] ?? false)
             ->isImmutableForSystemObjects($attrs[DomainFieldUsage::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS] ?? false)

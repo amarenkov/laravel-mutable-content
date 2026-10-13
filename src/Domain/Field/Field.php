@@ -91,6 +91,20 @@ class Field
     }
 
     /**
+     * Replaces the label with the one of the merged usage, if it has one.
+     */
+    public function applyUsageLabel()
+    {
+        $label = $this->usage()->label;
+
+        if ($label !== null && $label !== '') {
+            $this->label($label);
+        }
+
+        return $this;
+    }
+
+    /**
      * Type settings of the field, overridden by those of the merged usage.
      */
     public function getTypeSettings(): array

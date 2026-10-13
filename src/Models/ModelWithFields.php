@@ -421,6 +421,10 @@ class ModelWithFields extends Model
                 throw $exception;
             }
 
+            foreach ($definitions as $field) {
+                $field->applyUsageLabel();
+            }
+
             static::$fieldDefinitions[$cacheKey] = $definitions;
 
             self::$fieldDefinitionsCachedIn[static::class] = static::class;

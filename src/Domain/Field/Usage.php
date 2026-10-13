@@ -7,6 +7,8 @@ class Usage
     // const
     public const CODE_SCOPE = 'scope';
 
+    public const CODE_LABEL = 'label';
+
     public const CODE_IS_REQUIRED = 'is_required';
 
     public const CODE_IS_IMMUTABLE = 'is_immutable';
@@ -30,6 +32,10 @@ class Usage
 
         if ($usage->isImmutableForSystemObjects && !$this->isImmutableForSystemObjects) {
             $this->isImmutableForSystemObjects($usage->isImmutableForSystemObjects);
+        }
+
+        if ($usage->label !== null && $usage->label !== '') {
+            $this->label($usage->label);
         }
 
         if ($usage->typeSettings) {
@@ -60,6 +66,13 @@ class Usage
         return $this;
     }
 
+    public function label(?string $value)
+    {
+        $this->label = $value;
+
+        return $this;
+    }
+
     public function typeSettings(array $value)
     {
         $this->typeSettings = $value;
@@ -71,6 +84,7 @@ class Usage
     {
         return array_filter([
             self::CODE_SCOPE => $this->scope,
+            self::CODE_LABEL => $this->label,
             
             self::CODE_IS_IMMUTABLE => $this->isImmutable,
             self::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS => $this->isImmutableForSystemObjects
@@ -78,6 +92,8 @@ class Usage
     }
 
     public string $scope;
+
+    public ?string $label = null;
 
     public bool $isRequired = false;
 
