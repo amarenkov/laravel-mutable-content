@@ -30,6 +30,7 @@
     },
     "require": {
         "php": "^8.4",
+        "ext-bcmath": "*",
         "laravel/framework": "^13.8"
     },
     "autoload": {

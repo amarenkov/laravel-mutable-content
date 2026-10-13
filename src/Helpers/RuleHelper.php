@@ -8,12 +8,31 @@ use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 use Amarenkov\MutableContent\Rules\InLovs as RuleInLovs;
 use Amarenkov\MutableContent\Rules\InLov as RuleInLov;
 use Amarenkov\MutableContent\Rules\LovItemCode as RuleLovItemCode;
+use Amarenkov\MutableContent\Rules\Money as RuleMoney;
+use Amarenkov\MutableContent\Rules\NotZero as RuleNotZero;
 use Amarenkov\MutableContent\Rules\ObjectCode as RuleObjectCode;
 use Amarenkov\MutableContent\Rules\ObjectCodeExists as RuleObjectCodeExists;
 use Amarenkov\MutableContent\Rules\ObjectExists as RuleObjectExists;
 
 class RuleHelper
 {
+    /**
+     * Rules of a number field by the allow_negative and allow_zero type settings.
+     *
+     * @return array<string|object>
+     */
+    public static function getSignRules($field): array
+    {
+        $allowsNegative = TypeSettings::allowsNegative($field);
+        $allowsZero = TypeSettings::allowsZero($field);
+
+        if (!$allowsNegative) {
+            return [$allowsZero ? 'min:0' : 'gt:0'];
+        }
+
+        return $allowsZero ? [] : [new RuleNotZero()];
+    }
+
     /**
      * @param ?array<string> $scopes usage scopes, see ModelWithFields::getFieldScopes()
      */
@@ -45,40 +64,46 @@ class RuleHelper
 
                 case FieldType::TYPE_FLOAT:
                     $rules[] = 'numeric';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_INT:
                     $rules[] = 'integer';
+                    array_push($rules, ...static::getSignRules($field));
+                    break;
+
+                case FieldType::TYPE_MONEY:
+                    $rules[] = new RuleMoney(TypeSettings::currency($field), TypeSettings::allowsNegative($field), TypeSettings::allowsZero($field));
                     break;
 
                 case FieldType::TYPE_WEIGHT:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_DENSITY:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_SURFACE_DENSITY:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_LENGTH:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_AREA:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_VOLUME:
                     $rules[] = 'numeric';
-                    $rules[] = TypeSettings::allowsZero($field) ? 'min:0' : 'gt:0';
+                    array_push($rules, ...static::getSignRules($field));
                     break;
 
                 case FieldType::TYPE_DATETIME:

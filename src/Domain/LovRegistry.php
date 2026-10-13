@@ -29,6 +29,7 @@ class LovRegistry
     protected ?array $lovCodesById = null;
     protected array $lovItems = [];
     protected array $lovItemIcons = [];
+    protected array $lovItemFields = [];
     protected array $itemIcons = [];
 
     protected function getLovFromClass($class)
@@ -86,6 +87,7 @@ class LovRegistry
         if (@$this->lovItems[$lovCode] === null) {
             $this->lovItems[$lovCode] = [];
             $this->lovItemIcons[$lovCode] = [];
+            $this->lovItemFields[$lovCode] = [];
 
             if (@$this->sources[$lovCode]) {
                 $lov = $this->getLovFromSource($this->sources[$lovCode]);
@@ -96,6 +98,8 @@ class LovRegistry
                     if ($item->icon !== null) {
                         $this->lovItemIcons[$lovCode][$item->code] = $item->icon;
                     }
+
+                    $this->lovItemFields[$lovCode][$item->code] = $item->fields;
                 }
             }
 
@@ -111,6 +115,8 @@ class LovRegistry
                 if ((string)$itemModel->{ModelsLovItem::CODE_ICON} !== '') {
                     $this->lovItemIcons[$lovCode][$code] = $itemModel->{ModelsLovItem::CODE_ICON};
                 }
+
+                $this->lovItemFields[$lovCode][$code] = $itemModel->fields->getArrayCopy();
             }
 
             $this->lovItems[$lovCode] = array_replace($this->lovItems[$lovCode], $items);
@@ -128,6 +134,7 @@ class LovRegistry
         $this->lovCodesById = null;
         $this->lovItems = [];
         $this->lovItemIcons = [];
+        $this->lovItemFields = [];
     }
 
     public function getLovLabel($code)
@@ -167,6 +174,20 @@ class LovRegistry
         $this->initLov($lovCode);
 
         return $this->lovItemIcons[$lovCode][$code] ?? null;
+    }
+
+    /**
+     * Value of an item field (#[ItemField] of the LOV): from the DB, or from code for an item not seeded yet.
+     */
+    public function getLovItemField(string $lovCode, mixed $code, string $fieldCode, mixed $default = null): mixed
+    {
+        $this->initLov($lovCode);
+
+        if (!is_string($code) && !is_int($code)) {
+            return $default;
+        }
+
+        return $this->lovItemFields[$lovCode][$code][$fieldCode] ?? $default;
     }
 
     public function getLovItemsOptions($lovCode)
@@ -235,7 +256,7 @@ class LovRegistry
     {
         $this->itemIcons[$lovCode] = array_replace($this->itemIcons[$lovCode] ?? [], $icons);
 
-        unset($this->lovItems[$lovCode], $this->lovItemIcons[$lovCode]);
+        unset($this->lovItems[$lovCode], $this->lovItemIcons[$lovCode], $this->lovItemFields[$lovCode]);
 
         return $this;
     }

@@ -152,10 +152,6 @@ final readonly class Area implements FieldValue, HasUnits, JsonSerializable, Str
         if (!is_finite($squareMeters)) {
             throw new InvalidArgumentException('Area must be a finite number');
         }
-
-        if ($squareMeters < 0) {
-            throw new InvalidArgumentException('Area cannot be negative, '.$squareMeters.' m2 given');
-        }
     }
 
     public function toSquareMeters(): float
@@ -177,7 +173,7 @@ final readonly class Area implements FieldValue, HasUnits, JsonSerializable, Str
     {
         $result = $this->squareMeters - $other->squareMeters;
 
-        if ($result < 0 && $result > -self::EPSILON) {
+        if (abs($result) < self::EPSILON) {
             $result = 0.0;
         }
 
@@ -224,7 +220,17 @@ final readonly class Area implements FieldValue, HasUnits, JsonSerializable, Str
 
     public function isZero(): bool
     {
-        return $this->squareMeters < self::EPSILON;
+        return abs($this->squareMeters) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->squareMeters <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->squareMeters));
     }
 
     /**

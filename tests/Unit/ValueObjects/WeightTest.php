@@ -32,7 +32,6 @@ class WeightTest extends TestCase
     public static function invalidValues(): array
     {
         return [
-            'negative' => [fn () => new Weight(-1)],
             'infinite' => [fn () => new Weight(INF)],
             'not numeric' => [fn () => Weight::fromKilograms('abc')],
             'unknown unit' => [fn () => Weight::fromUnit(1, 'lb')],
@@ -80,10 +79,9 @@ class WeightTest extends TestCase
         $result = Weight::fromKilograms(0.3)->subtract(Weight::fromKilograms(0.1 + 0.2));
 
         $this->assertTrue($result->isZero());
-
-        $this->expectException(InvalidArgumentException::class);
-
-        Weight::fromKilograms(1)->subtract(Weight::fromKilograms(2));
+        $this->assertFalse($result->isNegative());
+        $this->assertTrue(Weight::fromKilograms(0.1 + 0.2)->subtract(Weight::fromKilograms(0.3))->isZero());
+        $this->assertSame(-1.0, Weight::fromKilograms(1)->subtract(Weight::fromKilograms(2))->kilograms);
     }
 
     public function test_comparison_with_tolerance(): void

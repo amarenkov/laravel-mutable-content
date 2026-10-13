@@ -9,7 +9,7 @@ use Stringable;
 use Amarenkov\MutableContent\Helpers\NumberHelper;
 
 /**
- * Density in kg/m³, not negative. Zero is allowed by the allow_zero type setting.
+ * Density in kg/m³. Zero and negative values are allowed by the allow_zero and allow_negative type settings.
  */
 final readonly class Density implements FieldValue, JsonSerializable, Stringable
 {
@@ -84,10 +84,6 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
     ) {
         if (!is_finite($kilogramsPerCubicMeter)) {
             throw new InvalidArgumentException('Density must be a finite number');
-        }
-
-        if ($kilogramsPerCubicMeter < 0) {
-            throw new InvalidArgumentException('Density cannot be negative, '.$kilogramsPerCubicMeter.' kg/m3 given');
         }
     }
 
@@ -165,7 +161,17 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
 
     public function isZero(): bool
     {
-        return $this->kilogramsPerCubicMeter < self::EPSILON;
+        return abs($this->kilogramsPerCubicMeter) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->kilogramsPerCubicMeter <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->kilogramsPerCubicMeter));
     }
 
     /**

@@ -91,10 +91,18 @@ Blade and Livewire application.
 
 ## Features
 
-- **Field types.** `string`, `text`, `bool`, `int`, `float`, `date`, `address`, `icon`, `lov`
-  (a list of values), `lov_item` (an item of a list), `object` (a reference to an object of
-  another class), `weight`, `length`, `area`, `volume`, `density`, `surface_density` and
-  `system`. The type drives the validation rule, the form component and the table column.
+- **Field types.** `string`, `text`, `bool`, `int`, `float`, `money`, `date`, `datetime`,
+  `address`, `icon`, `lov` (a list of values), `lov_item` (an item of a list), `object` (a
+  reference to an object of another class), `weight`, `length`, `area`, `volume`, `density`,
+  `surface_density` and `system`. The type drives the validation rule, the form component and
+  the table column. Number and measurement fields have the `allow_negative` and `allow_zero`
+  settings (on for numbers, off for measurements by default).
+- **Money.** A `money` field stores an amount and a currency code:
+  `{"amount": 1234.56, "currency": "USD"}`. Currencies are the items of the `currency` LOV
+  (`Models\Lov\Currency`, ISO 4217 codes with the number of decimals and a symbol); the
+  package declares USD, an application adds its own. `$order->getMoney('total')` returns a
+  `Money` object with exact decimal arithmetic (bcmath) and formatting. The `currency` setting
+  fixes the currency of a field.
 - **Value objects for measurements.** `Weight`, `Length`, `Area`, `Volume`, `Density` and
   `SurfaceDensity` store values in base units (kg, m, m², m³, kg/m³, kg/m²), support
   arithmetic, tolerant comparison and formatting. Assign one directly

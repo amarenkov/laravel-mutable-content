@@ -3,6 +3,7 @@
 namespace Amarenkov\MutableContent\Models;
 
 use ArrayAccess;
+use ArrayObject;
 use DateTimeInterface;
 use InvalidArgumentException;
 use LogicException;
@@ -48,6 +49,7 @@ use Amarenkov\MutableContent\ValueObjects\Area;
 use Amarenkov\MutableContent\ValueObjects\Density;
 use Amarenkov\MutableContent\ValueObjects\FieldValue;
 use Amarenkov\MutableContent\ValueObjects\Length;
+use Amarenkov\MutableContent\ValueObjects\Money;
 use Amarenkov\MutableContent\ValueObjects\SurfaceDensity;
 use Amarenkov\MutableContent\ValueObjects\Volume;
 use Amarenkov\MutableContent\ValueObjects\Weight;
@@ -241,6 +243,38 @@ class ModelWithFields extends Model
         } catch (Throwable) {
             return $value;
         }
+    }
+
+    /**
+     * Money field value: an array with an empty amount becomes null, a valid amount a JSON number, only the amount and the currency are kept.
+     * Other values are kept for the validation to reject.
+     */
+    public static function toMoneyValue(mixed $value): mixed
+    {
+        if ($value instanceof ArrayObject) {
+            $value = $value->getArrayCopy();
+        }
+
+        if (!is_array($value)) {
+            return $value === '' ? null : $value;
+        }
+
+        $amount = $value[Money::KEY_AMOUNT] ?? null;
+
+        if ($amount === null || (is_string($amount) && trim($amount) === '')) {
+            return null;
+        }
+
+        if (!Money::isAmount($amount)) {
+            return $value;
+        }
+
+        $amount = Money::toDecimalString($amount);
+
+        return [
+            Money::KEY_AMOUNT => str_contains($amount, '.') ? (float)$amount : (int)$amount,
+            Money::KEY_CURRENCY => $value[Money::KEY_CURRENCY] ?? null,
+        ];
     }
 
     public static function getTypeScope(string $typeCode): string
@@ -480,6 +514,10 @@ class ModelWithFields extends Model
 
         if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
             $value = static::toDateTimeValue($value);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_MONEY) {
+            $value = static::toMoneyValue($value);
         }
 
         return $value;
@@ -850,6 +888,11 @@ class ModelWithFields extends Model
     public function getVolume($name): ?Volume
     {
         return Volume::fromFieldValue($this->getField($name));
+    }
+
+    public function getMoney($name): ?Money
+    {
+        return Money::fromFieldValue($this->getField($name));
     }
 
     public function getDateTime($name): ?Carbon

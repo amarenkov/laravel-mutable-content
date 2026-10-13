@@ -8,6 +8,15 @@ return [
     'object_code' => 'Значение поля :attribute должно быть кодом объекта «:class».',
     'object_code_ambiguous' => 'Код в поле :attribute есть у нескольких объектов «:class».',
 
+    'not_zero' => 'Значение поля :attribute не должно быть нулём.',
+    'not_negative' => 'Значение поля :attribute не должно быть отрицательным.',
+    'money' => [
+        'format' => 'В поле :attribute должны быть сумма и валюта.',
+        'currency' => 'Валюта в поле :attribute должна быть элементом справочника «:lov».',
+        'currency_fixed' => 'Валюта в поле :attribute должна быть :currency.',
+        'decimals' => 'В поле :attribute должно быть не больше :decimals знаков после запятой.',
+    ],
+
     'field_type_system' => 'Тип поля «Системный» бывает только у полей, объявленных в коде.',
     'field_type_setting' => 'Недопустимое значение «:value» настройки типа поля «:setting».',
     'usage_class' => 'Укажите класс, к которому привязывается поле.',

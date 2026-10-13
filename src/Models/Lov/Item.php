@@ -124,5 +124,11 @@ class Item extends ModelWithFields
         if ($lovItem->icon !== null && (string)$this->{self::CODE_ICON} === '') {
             $this->{self::CODE_ICON} = $lovItem->icon;
         }
+
+        foreach ($lovItem->fields as $code => $value) {
+            if ($value !== null && $this->getField($code) === null) {
+                $this->setField($code, $value);
+            }
+        }
     }
 }

@@ -170,10 +170,6 @@ final readonly class Length implements FieldValue, HasUnits, JsonSerializable, S
         if (!is_finite($meters)) {
             throw new InvalidArgumentException('Length must be a finite number');
         }
-
-        if ($meters < 0) {
-            throw new InvalidArgumentException('Length cannot be negative, '.$meters.' m given');
-        }
     }
 
     public function toMeters(): float
@@ -210,7 +206,7 @@ final readonly class Length implements FieldValue, HasUnits, JsonSerializable, S
     {
         $meters = $this->meters - $other->meters;
 
-        if ($meters < 0 && $meters > -self::EPSILON) {
+        if (abs($meters) < self::EPSILON) {
             $meters = 0.0;
         }
 
@@ -257,7 +253,17 @@ final readonly class Length implements FieldValue, HasUnits, JsonSerializable, S
 
     public function isZero(): bool
     {
-        return $this->meters < self::EPSILON;
+        return abs($this->meters) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->meters <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->meters));
     }
 
     /**

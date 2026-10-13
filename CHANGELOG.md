@@ -7,6 +7,24 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `money` field type (`Type::TYPE_MONEY`, «Money»): `{"amount": 1234.56, "currency": "USD"}`, the amount a JSON number (exact `numeric` in PostgreSQL), the currency a code of the `currency` LOV. `ModelWithFields::getMoney()` returns `ValueObjects\Money`: the amount as a decimal string, bcmath arithmetic (`add`, `subtract`, `negate`, `abs`, `compareTo`) within one currency, `format()` with the currency decimals and symbol. On write an empty amount clears the field and a numeric string becomes a number (`toMoneyValue()`). Validation (`Rules\Money`): a known currency, no more decimals than the currency has.
+- `currency` LOV (`Models\Lov\Currency`, «Currency»): items are ISO 4217 codes with the `decimals` and `symbol` item fields; the package declares only USD. Requires `ext-bcmath`.
+- `#[LovItem(fields: [...])]`: values of the item fields of a code-declared item; `LovsSeeder` sets them while empty, so values changed in the admin panel stay. `LovRegistry::getLovItemField()` reads them.
+- `allow_negative` and `allow_zero` type settings of all number types: on by default for `int`, `float` and `money`, off for the measurements (`weight`, `length`, `area`, `volume`, `density`, `surface_density`) - the rules of existing fields stay the same. `currency` setting of `money` (the only currency of the field). `RuleHelper::getSignRules()`, `Rules\NotZero`.
+- `isNegative()` and `abs()` of the measurement value objects.
+
+### Changed
+
+- Measurement value objects (`Weight`, `Length`, `Area`, `Volume`, `Density`, `SurfaceDensity`) accept negative values: whether a field takes them is the `allow_negative` setting. `subtract()` returns a negative result instead of throwing; rounding noise of either sign is still clamped to zero. `isZero()` compares the absolute value (a negative value was counted as zero).
+
+### Fixed
+
+- `LovsSeeder` flushes the LOV registry: it saves without model events, so LOVs read before seeding in the same process stayed cached.
+
+Run `LovsSeeder` and `FieldsSeeder` to add the type, the LOV and its item fields.
+
 ## [0.7.4] - 2026-10-13
 
 ### Added

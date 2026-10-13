@@ -6,6 +6,9 @@ use ArrayObject;
 use InvalidArgumentException;
 
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
+use Amarenkov\MutableContent\Domain\LovRegistry;
+
+use Amarenkov\MutableContent\Models\Lov\Currency;
 
 use Amarenkov\MutableContent\ValueObjects\Area;
 use Amarenkov\MutableContent\ValueObjects\HasUnits;
@@ -27,6 +30,13 @@ class TypeSettings
 
     public const ALLOW_ZERO = 'allow_zero';
 
+    public const ALLOW_NEGATIVE = 'allow_negative';
+
+    public const CURRENCY = 'currency';
+
+    /**
+     * Measurement types: zero and negative values are off by default.
+     */
     public const ALLOW_ZERO_TYPES = [
         FieldType::TYPE_WEIGHT,
         FieldType::TYPE_LENGTH,
@@ -34,6 +44,15 @@ class TypeSettings
         FieldType::TYPE_VOLUME,
         FieldType::TYPE_DENSITY,
         FieldType::TYPE_SURFACE_DENSITY,
+    ];
+
+    /**
+     * Number types: zero and negative values are on by default.
+     */
+    public const SIGNED_TYPES = [
+        FieldType::TYPE_INT,
+        FieldType::TYPE_FLOAT,
+        FieldType::TYPE_MONEY,
     ];
 
     // static
@@ -63,11 +82,27 @@ class TypeSettings
             $result[self::DISPLAY_UNIT] = $unitClass::units();
         }
 
-        if (in_array($fieldType, self::ALLOW_ZERO_TYPES, true)) {
+        if (in_array($fieldType, self::ALLOW_ZERO_TYPES, true) || in_array($fieldType, self::SIGNED_TYPES, true)) {
+            $result[self::ALLOW_NEGATIVE] = [true, false];
             $result[self::ALLOW_ZERO] = [true, false];
         }
 
+        if ($fieldType === FieldType::TYPE_MONEY) {
+            $result[self::CURRENCY] = array_map('strval', array_keys(app(LovRegistry::class)->getLovItemsOptions(Currency::CODE)));
+        }
+
         return $result;
+    }
+
+    /**
+     * Value of a setting that is not set: zero and negative values are allowed for number types and not for measurements.
+     */
+    public static function getDefaultValue(string $fieldType, string $code): mixed
+    {
+        return match ($code) {
+            self::ALLOW_ZERO, self::ALLOW_NEGATIVE => in_array($fieldType, self::SIGNED_TYPES, true),
+            default => null,
+        };
     }
 
     /**
@@ -153,6 +188,19 @@ class TypeSettings
 
     public static function allowsZero(Field $field): bool
     {
-        return static::getValue($field, self::ALLOW_ZERO) === true;
+        return (static::getValue($field, self::ALLOW_ZERO) ?? static::getDefaultValue($field->fieldType, self::ALLOW_ZERO)) === true;
+    }
+
+    public static function allowsNegative(Field $field): bool
+    {
+        return (static::getValue($field, self::ALLOW_NEGATIVE) ?? static::getDefaultValue($field->fieldType, self::ALLOW_NEGATIVE)) === true;
+    }
+
+    /**
+     * The only currency of a money field, or null if any currency of the LOV is allowed.
+     */
+    public static function currency(Field $field): ?string
+    {
+        return $field->fieldType === FieldType::TYPE_MONEY ? static::getValue($field, self::CURRENCY) : null;
     }
 }

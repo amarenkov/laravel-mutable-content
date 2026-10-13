@@ -33,5 +33,10 @@
     "Type settings": "Настройки типа",
     "Undefined": "Не определен",
     "Volume": "Объем",
-    "Weight": "Вес"
+    "Weight": "Вес",
+    "Money": "Деньги",
+    "Currency": "Валюта",
+    "US dollar": "Доллар США",
+    "Decimal places": "Знаков после запятой",
+    "Symbol": "Символ"
 }

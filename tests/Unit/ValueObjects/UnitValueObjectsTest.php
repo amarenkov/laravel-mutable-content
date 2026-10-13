@@ -83,11 +83,15 @@ class UnitValueObjectsTest extends TestCase
      * @param class-string<HasUnits> $class
      */
     #[DataProvider('classesOnly')]
-    public function test_rejects_negative(string $class): void
+    public function test_accepts_negative(string $class): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $value = $class::fromFieldValue(-1);
 
-        $class::fromFieldValue(-1);
+        $this->assertSame(-1.0, $value->toFieldValue());
+        $this->assertTrue($value->isNegative());
+        $this->assertFalse($value->isZero());
+        $this->assertFalse($value->abs()->isNegative());
+        $this->assertFalse($class::fromFieldValue(0)->isNegative());
     }
 
     public function test_conversions(): void

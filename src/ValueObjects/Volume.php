@@ -157,10 +157,6 @@ final readonly class Volume implements FieldValue, HasUnits, JsonSerializable, S
         if (!is_finite($cubicMeters)) {
             throw new InvalidArgumentException('Volume must be a finite number');
         }
-
-        if ($cubicMeters < 0) {
-            throw new InvalidArgumentException('Volume cannot be negative, '.$cubicMeters.' m3 given');
-        }
     }
 
     public function toCubicMeters(): float
@@ -182,7 +178,7 @@ final readonly class Volume implements FieldValue, HasUnits, JsonSerializable, S
     {
         $result = $this->cubicMeters - $other->cubicMeters;
 
-        if ($result < 0 && $result > -self::EPSILON) {
+        if (abs($result) < self::EPSILON) {
             $result = 0.0;
         }
 
@@ -229,7 +225,17 @@ final readonly class Volume implements FieldValue, HasUnits, JsonSerializable, S
 
     public function isZero(): bool
     {
-        return $this->cubicMeters < self::EPSILON;
+        return abs($this->cubicMeters) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->cubicMeters <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->cubicMeters));
     }
 
     /**

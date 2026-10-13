@@ -36,6 +36,7 @@ use Amarenkov\MutableContent\Models\Field\Usage as ModelFieldUsage;
 
 use Amarenkov\MutableContent\Models\Lov\Lov as ModelLov;
 use Amarenkov\MutableContent\Models\Lov\Item as ModelLovItem;
+use Amarenkov\MutableContent\Models\Lov\Currency as ModelLovCurrency;
 
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as DomainLovFieldType;
 
@@ -57,6 +58,7 @@ class MutableContentServiceProvider extends ServiceProvider
         $lovRegistry = $this->app->make(LovRegistry::class);
 
         $lovRegistry->addClass(DomainLovFieldType::class);
+        $lovRegistry->addClass(ModelLovCurrency::class);
 
         $lovRegistry->addSource($this->app->make(MutableClassRegistry::class));
     }

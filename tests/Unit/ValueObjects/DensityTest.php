@@ -31,13 +31,15 @@ class DensityTest extends TestCase
         $this->assertSame(0.5, $density->volumeOf(Weight::fromKilograms(1000)));
     }
 
-    public function test_density_allows_zero_but_not_negative(): void
+    public function test_density_allows_zero_and_negative(): void
     {
         $this->assertTrue(Density::fromKilogramsPerCubicMeter(0)->isZero());
 
-        $this->expectException(InvalidArgumentException::class);
+        $negative = Density::fromKilogramsPerCubicMeter(-1);
 
-        Density::fromKilogramsPerCubicMeter(-1);
+        $this->assertTrue($negative->isNegative());
+        $this->assertFalse($negative->isZero());
+        $this->assertSame(1.0, $negative->abs()->toKilogramsPerCubicMeter());
     }
 
     public function test_volume_of_zero_density_fails(): void

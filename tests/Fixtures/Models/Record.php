@@ -10,6 +10,8 @@ use Amarenkov\MutableContent\Models\ModelWithFields;
 use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type;
 
+use Amarenkov\MutableContent\Models\Lov\Currency;
+
 use Amarenkov\MutableContent\Attributes\Class\Label as ClassLabel;
 use Amarenkov\MutableContent\Attributes\Field\Common\Code as FieldCode;
 
@@ -43,6 +45,12 @@ class Record extends ModelWithFields
 
     #[CFAType(Type::TYPE_DATETIME), CFALabel('Started at')]
     public const FIELD_STARTED_AT = 'started_at';
+
+    #[CFAType(Type::TYPE_MONEY), CFALabel('Price')]
+    public const FIELD_PRICE = 'price';
+
+    #[CFAType(Type::TYPE_MONEY), CFALabel('Fee'), CFATypeSettings([TypeSettings::CURRENCY => Currency::USD, TypeSettings::ALLOW_NEGATIVE => false, TypeSettings::ALLOW_ZERO => false])]
+    public const FIELD_FEE = 'fee';
 
     #[CFAType(Type::TYPE_LOV_ITEM), CFALabel('Status'), CFALovCode(RecordStatus::CODE)]
     public const FIELD_STATUS = 'status';

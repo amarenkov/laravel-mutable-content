@@ -9,7 +9,7 @@ use Stringable;
 use Amarenkov\MutableContent\Helpers\NumberHelper;
 
 /**
- * Surface density in kg/m², not negative. Zero is allowed by the allow_zero type setting.
+ * Surface density in kg/m². Zero and negative values are allowed by the allow_zero and allow_negative type settings.
  */
 final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Stringable
 {
@@ -77,10 +77,6 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
     ) {
         if (!is_finite($kilogramsPerSquareMeter)) {
             throw new InvalidArgumentException('Surface density must be a finite number');
-        }
-
-        if ($kilogramsPerSquareMeter < 0) {
-            throw new InvalidArgumentException('Surface density cannot be negative, '.$kilogramsPerSquareMeter.' kg/m2 given');
         }
     }
 
@@ -157,7 +153,17 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
 
     public function isZero(): bool
     {
-        return $this->kilogramsPerSquareMeter < self::EPSILON;
+        return abs($this->kilogramsPerSquareMeter) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->kilogramsPerSquareMeter <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->kilogramsPerSquareMeter));
     }
 
     /**

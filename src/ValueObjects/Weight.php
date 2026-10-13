@@ -160,10 +160,6 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
         if (!is_finite($kilograms)) {
             throw new InvalidArgumentException('Weight must be a finite number');
         }
-
-        if ($kilograms < 0) {
-            throw new InvalidArgumentException('Weight cannot be negative, '.$kilograms.' kg given');
-        }
     }
 
     public function toKilograms(): float
@@ -195,7 +191,7 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
     {
         $kilograms = $this->kilograms - $other->kilograms;
 
-        if ($kilograms < 0 && $kilograms > -self::EPSILON) {
+        if (abs($kilograms) < self::EPSILON) {
             $kilograms = 0.0;
         }
 
@@ -242,7 +238,17 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
 
     public function isZero(): bool
     {
-        return $this->kilograms < self::EPSILON;
+        return abs($this->kilograms) < self::EPSILON;
+    }
+
+    public function isNegative(): bool
+    {
+        return $this->kilograms <= -self::EPSILON;
+    }
+
+    public function abs(): self
+    {
+        return new self(abs($this->kilograms));
     }
 
     /**
