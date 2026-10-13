@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-10-13
+
 ### Added
 
 - Usage label (`label` of a field usage, «Field label»): the label of a field in one class or type, over the label of the field. It reaches everything built from the definitions: forms, tables, validation attributes, API docs, the change log. In code - the `UsageLabel` attribute on the field constant; `FieldsSeeder` copies it into the usage only while the usage label is empty, so a label set in the admin panel stays. With labels in several usages of a definition (an LOV item field), the last scope wins, as with type settings. Run `FieldsSeeder` to add the field to «Field usage».
@@ -181,7 +183,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.0...v0.7.1
