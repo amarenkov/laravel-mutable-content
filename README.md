@@ -442,6 +442,9 @@ The trade-off: PostgreSQL or MariaDB only, PHP 8.4 and Laravel 13.
 - [`amarenkov/laravel-mutable-content-tasks`](https://github.com/amarenkov/laravel-mutable-content-tasks):
   a task domain (tasks, participants, time tracking) with services and events, without a user
   interface. Work in progress.
+- [`amarenkov/laravel-mutable-content-finance`](https://github.com/amarenkov/laravel-mutable-content-finance):
+  a personal finance domain (accounts, operations split by categories, transfers, debts, receipts)
+  on `money` fields, with services and events, without a user interface. Work in progress.
 - [`amarenkov/laravel-mutable-content-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble):
   OpenAPI docs with field labels and LOV enums in Scramble.
 

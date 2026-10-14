@@ -52,7 +52,6 @@ class LovsSeeder extends Seeder
             }
         }, new LogData()->comment('LovsSeeder'));
 
-        // model events are off, so the cached LOVs are not flushed on save
         $registry->flush();
     }
 }
