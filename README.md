@@ -447,6 +447,9 @@ The trade-off: PostgreSQL or MariaDB only, PHP 8.4 and Laravel 13.
 - [`amarenkov/laravel-mutable-content-finance`](https://github.com/amarenkov/laravel-mutable-content-finance):
   a personal finance domain (accounts, operations split by categories, transfers, debts, receipts)
   on `money` fields, with services and events, without a user interface. Work in progress.
+- [`amarenkov/laravel-mutable-content-shop`](https://github.com/amarenkov/laravel-mutable-content-shop):
+  a shop domain (carts of users and guests, orders with item snapshots, price breaks) on `money`
+  fields, with a cart service and an event, without a user interface.
 - [`amarenkov/laravel-mutable-content-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble):
   OpenAPI docs with field labels and LOV enums in Scramble.
 
