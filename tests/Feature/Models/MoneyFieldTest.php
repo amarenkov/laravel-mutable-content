@@ -166,6 +166,44 @@ class MoneyFieldTest extends FeatureTestCase
         TypeSettings::normalize('money', [TypeSettings::CURRENCY => 'EUR']);
     }
 
+    public function test_decimals_setting_replaces_the_currency_decimals(): void
+    {
+        $this->assertSame(range(0, Money::MAX_DECIMALS), TypeSettings::getAllowedValues('money')[TypeSettings::DECIMALS]);
+        $this->assertSame([TypeSettings::DECIMALS => 6], TypeSettings::normalize('money', [TypeSettings::DECIMALS => 6]));
+        $this->assertArrayNotHasKey(TypeSettings::DECIMALS, TypeSettings::getAllowedValues('float'));
+
+        $field = Record::getFieldDefinitions()[Record::FIELD_PRICE];
+
+        $this->assertNull(TypeSettings::decimals($field));
+        $this->assertArrayHasKey('price', $this->errors([Record::FIELD_PRICE => ['amount' => '0.00452', 'currency' => 'USD']]));
+
+        $usage = Field::where('code', Record::FIELD_PRICE)->first()->usages()->first();
+        $usage->field_type_settings = [TypeSettings::DECIMALS => 6];
+        $usage->save();
+        Record::flushFieldDefinitions();
+
+        $this->assertSame(6, TypeSettings::decimals(Record::getFieldDefinitions()[Record::FIELD_PRICE]));
+        $this->assertSame([], $this->errors([Record::FIELD_PRICE => ['amount' => '0.00452', 'currency' => 'USD']]));
+        $this->assertSame(['The Price must have at most 6 digits after the decimal point.'], $this->errors([Record::FIELD_PRICE => ['amount' => '0.0045201', 'currency' => 'USD']])['price']);
+
+        $usage->field_type_settings = [TypeSettings::DECIMALS => 0];
+        $usage->save();
+        Record::flushFieldDefinitions();
+
+        $this->assertSame(['The Price must have at most 0 digits after the decimal point.'], $this->errors([Record::FIELD_PRICE => ['amount' => '1.5', 'currency' => 'USD']])['price']);
+
+        $record = $this->makeRecord('a', [Record::FIELD_PRICE => Money::of('0.004520', 'USD')]);
+
+        $this->assertSame('0.00452', $record->fresh()->getMoney(Record::FIELD_PRICE)->amount);
+    }
+
+    public function test_decimals_setting_rejects_other_values(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        TypeSettings::normalize('money', [TypeSettings::DECIMALS => Money::MAX_DECIMALS + 1]);
+    }
+
     public function test_sign_settings_of_number_fields(): void
     {
         $this->assertSame(['integer', 'required'], RuleHelper::getValidationRules(Record::class)['quantity']);

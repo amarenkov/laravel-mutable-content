@@ -7,6 +7,16 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `decimals` type setting of `money` (`TypeSettings::DECIMALS`, 0 to `Money::MAX_DECIMALS` = 8): digits after the point the field keeps instead of the decimals of its currency, e.g. unit prices with six decimals in USD. `TypeSettings::decimals()`; validation (`Rules\Money`) checks it.
+- `Rules\Money::forField()`: the rule with all type settings of a money field.
+- `Money::multiply()` (a unit price times a quantity, not rounded) and `Money::round()` (half away from zero, to the currency decimals by default).
+
+### Changed
+
+- `Money` arithmetic uses `brick/math` (a dependency of Laravel) instead of the bcmath extension: `ext-bcmath` is no longer required. `Money::number()` returns `Brick\Math\BigDecimal` instead of `BcMath\Number`; `of()`, `toDecimalString()` and `multiply()` take a `BigDecimal`.
+
 ## [0.7.6] - 2026-10-15
 
 ### Added

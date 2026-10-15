@@ -73,7 +73,7 @@ class RuleHelper
                     break;
 
                 case FieldType::TYPE_MONEY:
-                    $rules[] = new RuleMoney(TypeSettings::currency($field), TypeSettings::allowsNegative($field), TypeSettings::allowsZero($field));
+                    $rules[] = RuleMoney::forField($field);
                     break;
 
                 case FieldType::TYPE_WEIGHT:

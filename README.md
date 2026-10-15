@@ -101,8 +101,10 @@ Blade and Livewire application.
   `{"amount": 1234.56, "currency": "USD"}`. Currencies are the items of the `currency` LOV
   (`Models\Lov\Currency`, ISO 4217 codes with the number of decimals and a symbol); the
   package declares USD, an application adds its own. `$order->getMoney('total')` returns a
-  `Money` object with exact decimal arithmetic (bcmath) and formatting. The `currency` setting
-  fixes the currency of a field.
+  `Money` object with exact decimal arithmetic (brick/math) and formatting. The `currency` setting
+  fixes the currency of a field, and the `decimals` setting replaces the decimals of the currency
+  (unit prices with six decimals, for example). `multiply()` and `round()` turn a unit price
+  into a line total: `$price->multiply($quantity)->round()`.
 - **Value objects for measurements.** `Weight`, `Length`, `Area`, `Volume`, `Density` and
   `SurfaceDensity` store values in base units (kg, m, m², m³, kg/m³, kg/m²), support
   arithmetic, tolerant comparison and formatting. Assign one directly

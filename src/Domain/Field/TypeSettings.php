@@ -13,6 +13,7 @@ use Amarenkov\MutableContent\Models\Lov\Currency;
 use Amarenkov\MutableContent\ValueObjects\Area;
 use Amarenkov\MutableContent\ValueObjects\HasUnits;
 use Amarenkov\MutableContent\ValueObjects\Length;
+use Amarenkov\MutableContent\ValueObjects\Money;
 use Amarenkov\MutableContent\ValueObjects\Volume;
 use Amarenkov\MutableContent\ValueObjects\Weight;
 
@@ -33,6 +34,8 @@ class TypeSettings
     public const ALLOW_NEGATIVE = 'allow_negative';
 
     public const CURRENCY = 'currency';
+
+    public const DECIMALS = 'decimals';
 
     /**
      * Measurement types: zero and negative values are off by default.
@@ -89,6 +92,7 @@ class TypeSettings
 
         if ($fieldType === FieldType::TYPE_MONEY) {
             $result[self::CURRENCY] = array_map('strval', array_keys(app(LovRegistry::class)->getLovItemsOptions(Currency::CODE)));
+            $result[self::DECIMALS] = range(0, Money::MAX_DECIMALS);
         }
 
         return $result;
@@ -202,5 +206,13 @@ class TypeSettings
     public static function currency(Field $field): ?string
     {
         return $field->fieldType === FieldType::TYPE_MONEY ? static::getValue($field, self::CURRENCY) : null;
+    }
+
+    /**
+     * Digits after the point of a money field instead of the decimals of its currency, or null to use the currency ones.
+     */
+    public static function decimals(Field $field): ?int
+    {
+        return $field->fieldType === FieldType::TYPE_MONEY ? static::getValue($field, self::DECIMALS) : null;
     }
 }

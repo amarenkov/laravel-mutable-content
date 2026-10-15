@@ -4,6 +4,8 @@ namespace Amarenkov\MutableContent\Tests\Unit\ValueObjects;
 
 use InvalidArgumentException;
 
+use Brick\Math\BigDecimal;
+
 use Amarenkov\MutableContent\Tests\TestCase;
 use Amarenkov\MutableContent\ValueObjects\Money;
 
@@ -44,6 +46,20 @@ class MoneyTest extends TestCase
         $this->assertSame('5', Money::of(-5, 'USD')->abs()->amount);
         $this->assertSame('-5', Money::of(5, 'USD')->negate()->amount);
         $this->assertSame('90071992547409.93', Money::of('90071992547409.92', 'USD')->add(Money::of('0.01', 'USD'))->amount);
+    }
+
+    public function test_multiply_and_round(): void
+    {
+        $this->assertSame('45.2', Money::of('0.00452', 'USD')->multiply(10000)->amount);
+        $this->assertSame('0.03164', Money::of('0.004520', 'USD')->multiply(7)->amount);
+        $this->assertSame('0.03', Money::of('0.03164', 'USD')->round()->amount);
+        $this->assertSame('0.032', Money::of('0.03164', 'USD')->round(3)->amount);
+        $this->assertSame('0.01', Money::of('0.005', 'USD')->round()->amount);
+        $this->assertSame('-0.01', Money::of('-0.005', 'USD')->round()->amount);
+        $this->assertSame('3', Money::of('1.5', 'USD')->multiply('2')->amount);
+        $this->assertSame('USD', Money::of(1, 'USD')->multiply(3)->currency);
+        $this->assertSame('2.5', Money::of(BigDecimal::of('1.25'), 'USD')->multiply(BigDecimal::of(2))->amount);
+        $this->assertInstanceOf(BigDecimal::class, Money::of('1.5', 'USD')->number());
     }
 
     public function test_comparison(): void

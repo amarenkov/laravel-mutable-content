@@ -6,6 +6,8 @@ use Closure;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 
+use Amarenkov\MutableContent\Domain\Field\Field;
+use Amarenkov\MutableContent\Domain\Field\TypeSettings;
 use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Models\Lov\Currency;
@@ -17,10 +19,24 @@ use Amarenkov\MutableContent\ValueObjects\Money as MoneyValue;
  */
 class Money implements ValidationRule
 {
+    // static
+    /**
+     * The rule with the type settings of a money field.
+     */
+    public static function forField(Field $field): self
+    {
+        return new self(TypeSettings::currency($field), TypeSettings::allowsNegative($field), TypeSettings::allowsZero($field), TypeSettings::decimals($field));
+    }
+
+    // public
+    /**
+     * Without decimals the amount may have as many digits after the point as its currency.
+     */
     public function __construct(
         protected ?string $currency = null,
         protected bool $allowNegative = true,
-        protected bool $allowZero = true
+        protected bool $allowZero = true,
+        protected ?int $decimals = null
     )
     {
     }
@@ -55,8 +71,10 @@ class Money implements ValidationRule
 
         $money = MoneyValue::of($value[MoneyValue::KEY_AMOUNT], $currency);
 
-        if ($money->scale() > $money->decimals()) {
-            $fail(__('mutable-content::validation.money.decimals', ['decimals' => $money->decimals()]));
+        $decimals = $this->decimals ?? $money->decimals();
+
+        if ($money->scale() > $decimals) {
+            $fail(__('mutable-content::validation.money.decimals', ['decimals' => $decimals]));
         }
 
         if (!$this->allowNegative && $money->isNegative()) {

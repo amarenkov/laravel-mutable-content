@@ -6,7 +6,8 @@ use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 
-use BcMath\Number;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 
 use Amarenkov\MutableContent\Helpers\NumberHelper;
 
@@ -15,7 +16,7 @@ use Amarenkov\MutableContent\Models\Lov\Currency;
 /**
  * Amount of money in a currency of the currency LOV. Stored as {"amount": 1234.56, "currency": "USD"}:
  * the amount is a JSON number, exact in the database; in PHP it is kept as a decimal string, so the arithmetic
- * (bcmath) has no float errors.
+ * (brick/math) has no float errors.
  */
 final readonly class Money implements FieldValue, JsonSerializable, Stringable
 {
@@ -28,10 +29,15 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
      */
     protected const FLOAT_DECIMALS = 8;
 
+    /**
+     * Most digits after the point a money field may keep (the decimals type setting).
+     */
+    public const MAX_DECIMALS = self::FLOAT_DECIMALS;
+
     protected const AMOUNT_PATTERN = '/^[-+]?(\d+(\.\d*)?|\.\d+)$/';
 
     // static
-    public static function of(int|float|string|Number $amount, string $currency): self
+    public static function of(int|float|string|BigDecimal $amount, string $currency): self
     {
         return new self(self::toDecimalString($amount), $currency);
     }
@@ -70,10 +76,10 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
     /**
      * Decimal string without the exponent, the plus sign and trailing zeros: "1234.5", "-3", "0".
      */
-    public static function toDecimalString(int|float|string|Number $amount): string
+    public static function toDecimalString(int|float|string|BigDecimal $amount): string
     {
-        if ($amount instanceof Number) {
-            $amount = $amount->value;
+        if ($amount instanceof BigDecimal) {
+            $amount = (string)$amount;
         } elseif (is_float($amount)) {
             if (!is_finite($amount)) {
                 throw new InvalidArgumentException('Amount must be finite');
@@ -121,7 +127,7 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
         }
     }
 
-    protected function withAmount(Number $amount): self
+    protected function withAmount(BigDecimal $amount): self
     {
         return new self(self::toDecimalString($amount), $this->currency);
     }
@@ -140,9 +146,9 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
         }
     }
 
-    public function number(): Number
+    public function number(): BigDecimal
     {
-        return new Number($this->amount);
+        return BigDecimal::of($this->amount);
     }
 
     /**
@@ -162,19 +168,35 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
     {
         $this->assertSameCurrency($other);
 
-        return $this->withAmount($this->number() + $other->number());
+        return $this->withAmount($this->number()->plus($other->number()));
     }
 
     public function subtract(self $other): self
     {
         $this->assertSameCurrency($other);
 
-        return $this->withAmount($this->number() - $other->number());
+        return $this->withAmount($this->number()->minus($other->number()));
+    }
+
+    /**
+     * Amount times a number, e.g. a unit price times a quantity; the result is not rounded.
+     */
+    public function multiply(int|float|string|BigDecimal $factor): self
+    {
+        return $this->withAmount($this->number()->multipliedBy(self::toDecimalString($factor)));
+    }
+
+    /**
+     * Amount rounded half away from zero to the given digits after the point, by default to the decimals of the currency.
+     */
+    public function round(?int $decimals = null): self
+    {
+        return $this->withAmount($this->number()->toScale($decimals ?? $this->decimals(), RoundingMode::HalfUp));
     }
 
     public function negate(): self
     {
-        return $this->withAmount(-$this->number());
+        return $this->withAmount($this->number()->negated());
     }
 
     public function abs(): self
@@ -186,7 +208,7 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
     {
         $this->assertSameCurrency($other);
 
-        return $this->number() <=> $other->number();
+        return $this->number()->compareTo($other->number());
     }
 
     public function equals(self $other): bool
@@ -216,7 +238,7 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
     {
         $decimals ??= $this->decimals();
 
-        $rounded = self::toDecimalString($this->number()->round($decimals));
+        $rounded = self::toDecimalString($this->number()->toScale($decimals, RoundingMode::HalfUp));
 
         [$integer, $fraction] = array_pad(explode('.', ltrim($rounded, '-'), 2), 2, '');
 
