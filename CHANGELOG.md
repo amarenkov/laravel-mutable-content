@@ -7,6 +7,14 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `mutable-content.schema_cache` config option (`MUTABLE_CONTENT_SCHEMA_CACHE`, on by default): generated columns of the tables (`getExtractedFields()`, `getFieldMaxLengths()`) are kept in the application cache instead of being read from the database schema on every request. The cache is dropped after every `migrate` run (`MigrationsEnded`) and by `cache:clear`; it is not used while migrations run. `Helpers\SchemaHelper`, `ModelWithFields::flushExtractedFields()`.
+
+### Changed
+
+- Field usages of all classes are loaded by one query per process and kept until `flushFieldDefinitions()`, instead of one query per class and scope set.
+
 ## [0.7.5] - 2026-10-13
 
 ### Added

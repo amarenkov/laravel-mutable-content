@@ -41,6 +41,7 @@ use Amarenkov\MutableContent\Database\Log\LogEvent;
 use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 use Amarenkov\MutableContent\Helpers\ObjectHelper;
+use Amarenkov\MutableContent\Helpers\SchemaHelper;
 
 use Amarenkov\MutableContent\Models\Field\Usage as UsageModel;
 use Amarenkov\MutableContent\Models\Log\ModelLogContext;
@@ -90,6 +91,15 @@ class ModelWithFields extends Model
     protected static array $extractedFields = [];
 
     /**
+     * @var ?array<Field>
+     */
+    protected static ?array $usageFields = null;
+
+    protected static bool $usageFieldsLoading = false;
+
+    protected static array $fieldDefinitionsCachedWhileLoading = [];
+
+    /**
      * Reset cached field definitions of all classes.
      */
     public static function flushFieldDefinitions(): void
@@ -99,6 +109,67 @@ class ModelWithFields extends Model
         }
 
         self::$fieldDefinitionsCachedIn = [];
+
+        self::$usageFields = null;
+    }
+
+    /**
+     * Reset cached generated columns of all classes.
+     */
+    public static function flushExtractedFields(): void
+    {
+        self::$extractedFields = [];
+    }
+
+    /**
+     * Fields of the usages bound to the scopes, ordered by usage id; null while the usages are being loaded.
+     * The usages of all scopes are loaded by one query and kept until flushFieldDefinitions().
+     * Definitions built while loading have system fields only and are dropped once the usages are loaded.
+     *
+     * @param array<string> $scopes
+     * @return ?array<Field>
+     */
+    protected static function usageFields(array $scopes): ?array
+    {
+        if (self::$usageFields === null) {
+            if (self::$usageFieldsLoading) {
+                return null;
+            }
+
+            self::$usageFieldsLoading = true;
+
+            try {
+                $usageFields = [];
+
+                foreach (UsageModel::whereHas('field')->with('field')->orderBy('id')->get() as $usageModel) {
+                    $usageFields[] = $usageModel->toDomainField();
+                }
+
+                self::$usageFields = $usageFields;
+            } finally {
+                self::$usageFieldsLoading = false;
+
+                foreach (self::$fieldDefinitionsCachedWhileLoading as $class) {
+                    $class::$fieldDefinitions = null;
+                }
+
+                self::$fieldDefinitionsCachedWhileLoading = [];
+            }
+        }
+
+        $scopes = array_flip($scopes);
+        $result = [];
+
+        foreach (self::$usageFields as $usageField) {
+            if (isset($scopes[array_key_first($usageField->usages)])) {
+                $field = clone $usageField;
+                $field->usages = array_map(fn ($usage) => clone $usage, $field->usages);
+
+                $result[] = $field;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -318,15 +389,7 @@ class ModelWithFields extends Model
         if (!isset(self::$extractedFields[static::class])) {
             $model = new static();
 
-            $result = [];
-
-            foreach ($model->getConnection()->getSchemaBuilder()->getColumns($model->getTable()) as $column) {
-                if ($column['generation'] !== null) {
-                    $result[$column['name']] = $column['type'];
-                }
-            }
-
-            self::$extractedFields[static::class] = $result;
+            self::$extractedFields[static::class] = SchemaHelper::generatedColumns($model->getConnection(), $model->getTable());
         }
 
         return self::$extractedFields[static::class];
@@ -432,9 +495,15 @@ class ModelWithFields extends Model
             static::$fieldDefinitions[$cacheKey] = $definitions;
 
             try {
-                foreach (UsageModel::whereIn(UsageModel::CODE_SCOPE, $scopes)->whereHas('field')->with('field')->orderBy('id')->get() as $usageModel) {
-                    $field = $usageModel->toDomainField();
+                $usageFields = static::usageFields($scopes);
 
+                if ($usageFields === null) {
+                    self::$fieldDefinitionsCachedWhileLoading[static::class] = static::class;
+
+                    return $definitions;
+                }
+
+                foreach ($usageFields as $field) {
                     if ($error = FieldCodeHelper::getErrorForClass($field->code, static::class)) {
                         Log::warning('Mutable content: field skipped. '.$error);
 

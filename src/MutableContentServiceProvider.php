@@ -5,6 +5,8 @@ namespace Amarenkov\MutableContent;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Queue\Events\JobProcessing;
 
 use Illuminate\Console\Scheduling\Schedule;
@@ -28,6 +30,8 @@ use Amarenkov\MutableContent\Domain\MutableClassRegistry;
 use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Database\Log\LogContext;
+
+use Amarenkov\MutableContent\Helpers\SchemaHelper;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
 
@@ -75,6 +79,19 @@ class MutableContentServiceProvider extends ServiceProvider
 
         Event::listen(JobProcessing::class, $flush);
         Event::listen('Laravel\Octane\Events\RequestReceived', $flush);
+    }
+
+    protected function flushSchemaCacheOnMigrations()
+    {
+        Event::listen(MigrationsStarted::class, function () {
+            SchemaHelper::migrationsStarted();
+        });
+
+        Event::listen(MigrationsEnded::class, function () {
+            SchemaHelper::migrationsEnded();
+
+            ModelWithFields::flushExtractedFields();
+        });
     }
 
     protected function trackLogTransactions()
@@ -132,6 +149,7 @@ class MutableContentServiceProvider extends ServiceProvider
         $this->registerLovs();
 
         $this->flushCachesInLongRunningProcesses();
+        $this->flushSchemaCacheOnMigrations();
         $this->trackLogTransactions();
 
         if ($this->app->runningInConsole()) {
