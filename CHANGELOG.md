@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-10-15
+
 ### Added
 
 - `mutable-content.schema_cache` config option (`MUTABLE_CONTENT_SCHEMA_CACHE`, on by default): generated columns of the tables (`getExtractedFields()`, `getFieldMaxLengths()`) are kept in the application cache instead of being read from the database schema on every request. The cache is dropped after every `migrate` run (`MigrationsEnded`) and by `cache:clear`; it is not used while migrations run. `Helpers\SchemaHelper`, `ModelWithFields::flushExtractedFields()`.
@@ -211,7 +213,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.2...v0.7.3
