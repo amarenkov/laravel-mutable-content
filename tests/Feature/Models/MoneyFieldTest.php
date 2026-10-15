@@ -197,6 +197,16 @@ class MoneyFieldTest extends FeatureTestCase
         $this->assertSame('0.00452', $record->fresh()->getMoney(Record::FIELD_PRICE)->amount);
     }
 
+    public function test_round_uses_the_currency_decimals_by_default(): void
+    {
+        $this->addCurrency('JPY', 'Japanese yen', 0, null);
+
+        $this->assertSame('0.03', Money::of('0.03164', 'USD')->round()->amount);
+        $this->assertSame('0.01', Money::of('0.005', 'USD')->round()->amount);
+        $this->assertSame('3', Money::of('2.5', 'JPY')->round()->amount);
+        $this->assertSame('10.24', Money::of('0.01707', 'USD')->multiply(600)->round()->amount);
+    }
+
     public function test_decimals_setting_rejects_other_values(): void
     {
         $this->expectException(\InvalidArgumentException::class);
