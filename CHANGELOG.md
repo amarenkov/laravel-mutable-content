@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-10-15
+
 ### Added
 
 - `decimals` type setting of `money` (`TypeSettings::DECIMALS`, 0 to `Money::MAX_DECIMALS` = 8): digits after the point the field keeps instead of the decimals of its currency, e.g. unit prices with six decimals in USD. `TypeSettings::decimals()`; validation (`Rules\Money`) checks it.
@@ -223,7 +225,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...HEAD
+[0.7.7]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.3...v0.7.4
