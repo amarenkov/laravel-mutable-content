@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Change log descriptions (`LogHelper::describeChanges()`, `Entry::describe()`) show `money` values as formatted amounts with the decimals of the field (`10.50 $`) instead of JSON.
+
 ## [0.7.7] - 2026-10-15
 
 ### Added

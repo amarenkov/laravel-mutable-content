@@ -21,6 +21,7 @@ use Amarenkov\MutableContent\Domain\LovRegistry;
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as SchemaBuilder;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
+use Amarenkov\MutableContent\ValueObjects\Money;
 
 /**
  * Reads the change log written by Schema::createWithLog() triggers.
@@ -257,6 +258,10 @@ class LogHelper
     {
         if ($value === null || $value === '' || $value === []) {
             return null;
+        }
+
+        if ($field?->fieldType === FieldType::TYPE_MONEY && ($money = Money::fromFieldValue($value))) {
+            return $money->format(TypeSettings::decimals($field));
         }
 
         if (is_array($value)) {

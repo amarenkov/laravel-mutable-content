@@ -544,6 +544,17 @@ class ChangeLogTest extends FeatureTestCase
         );
     }
 
+    public function test_describe_changes_of_money(): void
+    {
+        $this->assertSame(
+            ['Price: 10.50 $ → 12.00 $', 'Fee: 3.00 $ → empty'],
+            str_replace("\u{00A0}", ' ', LogHelper::describeChanges(Record::class, Changes::between(
+                ['price' => ['amount' => 10.5, 'currency' => 'USD'], 'fee' => ['amount' => 3, 'currency' => 'USD']],
+                ['price' => ['amount' => 12, 'currency' => 'USD']]
+            )))
+        );
+    }
+
     public function test_event_of_unsaved_object_is_not_written(): void
     {
         $this->expectException(LogicException::class);
