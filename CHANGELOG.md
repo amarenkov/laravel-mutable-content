@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-10-18
+
 ### Fixed
 
 - Change log descriptions (`LogHelper::describeChanges()`, `Entry::describe()`) show `money` values as formatted amounts with the decimals of the field (`10.50 $`) instead of JSON.
@@ -229,7 +231,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...HEAD
+[0.7.8]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.4...v0.7.5
