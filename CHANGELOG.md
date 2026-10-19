@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-10-19
+
 ### Fixed
 
 - `LovsSeeder` removes the system mark from the items of a system list of values that are no longer declared in code, so they can be deleted. The items themselves are kept, as records may refer to them.
@@ -242,7 +244,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.9...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.10...HEAD
+[0.7.10]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...v0.7.7
