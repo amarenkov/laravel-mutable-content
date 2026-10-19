@@ -450,6 +450,9 @@ The trade-off: PostgreSQL or MariaDB only, PHP 8.4 and Laravel 13.
 - [`amarenkov/laravel-mutable-content-shop`](https://github.com/amarenkov/laravel-mutable-content-shop):
   a shop domain (carts of users and guests, orders with item snapshots, price breaks) on `money`
   fields, with a cart service and an event, without a user interface.
+- [`amarenkov/laravel-mutable-content-ai`](https://github.com/amarenkov/laravel-mutable-content-ai):
+  memory, a run journal, approvals, editable prompts and tool schemas from fields for `laravel/ai`
+  agents, without a user interface. Very early.
 - [`amarenkov/laravel-mutable-content-scramble`](https://github.com/amarenkov/laravel-mutable-content-scramble):
   OpenAPI docs with field labels and LOV enums in Scramble.
 
