@@ -48,6 +48,20 @@ class LovTest extends FeatureTestCase
         $this->assertSame($before, $counts());
     }
 
+    public function test_items_removed_from_code_stop_being_system(): void
+    {
+        $item = new Item();
+        $item->fill([Item::FIELD_LOV_ID => $this->statusLov()->id, 'code' => 'archived', 'label' => 'Archived', 'is_system' => true]);
+        $item->save();
+
+        $this->assertTrue($item->fresh()->isSystem());
+
+        $this->seed(LovsSeeder::class);
+
+        $this->assertFalse($item->fresh()->isSystem());
+        $this->assertTrue($this->statusLov()->items()->where('code', 'draft')->first()->isSystem());
+    }
+
     public function test_registry_merges_code_and_database_items(): void
     {
         $item = new Item();

@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `LovsSeeder` removes the system mark from the items of a system list of values that are no longer declared in code, so they can be deleted. The items themselves are kept, as records may refer to them.
+
 ## [0.7.9] - 2026-10-19
 
 ### Added

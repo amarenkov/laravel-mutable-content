@@ -173,7 +173,9 @@ php artisan db:seed --class="Amarenkov\MutableContent\Database\Seeders\FieldsSee
 ```
 
 Run the seeders in this order: lists of values first, then fields. Run them again on deploy:
-they add the fields and lists declared in code since the last run.
+they add the fields and lists declared in code since the last run. An item removed from a list in
+code stops being system and can be deleted in the admin panel; the seeder does not delete it, as records
+may still refer to it.
 
 ## Quick start
 

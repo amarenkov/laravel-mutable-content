@@ -49,6 +49,13 @@ class LovsSeeder extends Seeder
                         $lovItemModel->save();
                     }
                 }
+
+                foreach ($lovModel->items()->get() as $lovItemModel) {
+                    if ($lovItemModel->isSystem() && !isset($lov->items[$lovItemModel->code()])) {
+                        $lovItemModel->{Field::COMMON_CODE_IS_SYSTEM} = false;
+                        $lovItemModel->save();
+                    }
+                }
             }
         }, new LogData()->comment('LovsSeeder'));
 
