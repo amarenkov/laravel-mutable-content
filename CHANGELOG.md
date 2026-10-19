@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-10-19
+
 ### Added
 
 - `secret` field type (`Type::TYPE_SECRET`): the value is encrypted with the application key when it is set, `getSecret()` returns the text. The same text set again keeps the stored value; an empty string removes it.
@@ -236,7 +238,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.9...HEAD
+[0.7.9]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.5...v0.7.6
