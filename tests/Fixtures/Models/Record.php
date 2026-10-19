@@ -52,6 +52,9 @@ class Record extends ModelWithFields
     #[CFAType(Type::TYPE_MONEY), CFALabel('Fee'), CFATypeSettings([TypeSettings::CURRENCY => Currency::USD, TypeSettings::ALLOW_NEGATIVE => false, TypeSettings::ALLOW_ZERO => false])]
     public const FIELD_FEE = 'fee';
 
+    #[CFAType(Type::TYPE_SECRET), CFALabel('Token')]
+    public const FIELD_TOKEN = 'token';
+
     #[CFAType(Type::TYPE_LOV_ITEM), CFALabel('Status'), CFALovCode(RecordStatus::CODE)]
     public const FIELD_STATUS = 'status';
 

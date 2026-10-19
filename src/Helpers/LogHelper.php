@@ -260,6 +260,10 @@ class LogHelper
             return null;
         }
 
+        if ($field?->fieldType === FieldType::TYPE_SECRET) {
+            return SecretHelper::maskStored($field, $value);
+        }
+
         if ($field?->fieldType === FieldType::TYPE_MONEY && ($money = Money::fromFieldValue($value))) {
             return $money->format(TypeSettings::decimals($field));
         }

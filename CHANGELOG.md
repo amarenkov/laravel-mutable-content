@@ -7,6 +7,11 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `secret` field type (`Type::TYPE_SECRET`): the value is encrypted with the application key when it is set, `getSecret()` returns the text. The same text set again keeps the stored value; an empty string removes it.
+- `visible_start` and `visible_end` type settings of `secret` (0 to `TypeSettings::MAX_VISIBLE` = 8, two by default; `TypeSettings::visibleStart()`, `visibleEnd()`): characters shown at the ends of a secret, with a middle of a fixed length (`sk****9f`); a secret shorter than twice the shown characters is masked entirely. `maskedSecret()`, `Helpers\SecretHelper` (`encrypt()`, `decrypt()`, `mask()`, `maskStored()`). Change log descriptions show the mask.
+
 ## [0.7.8] - 2026-10-18
 
 ### Fixed

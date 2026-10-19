@@ -92,7 +92,7 @@ Blade and Livewire application.
 ## Features
 
 - **Field types.** `string`, `text`, `bool`, `int`, `float`, `money`, `date`, `datetime`,
-  `address`, `icon`, `lov` (a list of values), `lov_item` (an item of a list), `object` (a
+  `address`, `icon`, `secret`, `lov` (a list of values), `lov_item` (an item of a list), `object` (a
   reference to an object of another class), `weight`, `length`, `area`, `volume`, `density`,
   `surface_density` and `system`. The type drives the validation rule, the form component and
   the table column. Number and measurement fields have the `allow_negative` and `allow_zero`
@@ -105,6 +105,12 @@ Blade and Livewire application.
   fixes the currency of a field, and the `decimals` setting replaces the decimals of the currency
   (unit prices with six decimals, for example). `multiply()` and `round()` turn a unit price
   into a line total: `$price->multiply($quantity)->round()`.
+- **Secrets.** A `secret` field (an API key, a token) is encrypted with the application key when
+  it is set and stays encrypted in the table and in the change log. It is shown with a few
+  characters at the ends and a middle of a fixed length (`sk****9f`): the `visible_start` and
+  `visible_end` settings, two by default, a short secret is masked entirely.
+  `$account->getSecret('api_key')` returns the text, `maskedSecret('api_key')` the mask. Setting the same text again keeps the stored
+  value, so the record does not become dirty; an empty string removes the value.
 - **Value objects for measurements.** `Weight`, `Length`, `Area`, `Volume`, `Density` and
   `SurfaceDensity` store values in base units (kg, m, m², m³, kg/m³, kg/m²), support
   arithmetic, tolerant comparison and formatting. Assign one directly

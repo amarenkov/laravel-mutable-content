@@ -41,6 +41,7 @@ use Amarenkov\MutableContent\Database\Log\LogEvent;
 use Amarenkov\MutableContent\Helpers\DatabaseHelper;
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 use Amarenkov\MutableContent\Helpers\ObjectHelper;
+use Amarenkov\MutableContent\Helpers\SecretHelper;
 use Amarenkov\MutableContent\Helpers\SchemaHelper;
 
 use Amarenkov\MutableContent\Models\Field\Usage as UsageModel;
@@ -589,7 +590,34 @@ class ModelWithFields extends Model
             $value = static::toMoneyValue($value);
         }
 
+        if ($field && $field->fieldType === FieldType::TYPE_SECRET) {
+            $value = $this->toSecretValue($key, $value);
+        }
+
         return $value;
+    }
+
+    /**
+     * Secret field value: a text is encrypted, the text of the current value keeps the current ciphertext, an encrypted value is kept.
+     * Other values are kept for the validation to reject.
+     */
+    protected function toSecretValue(string $key, mixed $value): mixed
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (SecretHelper::isEncrypted($value)) {
+            return $value;
+        }
+
+        $current = $this->getField($key);
+
+        return SecretHelper::decrypt($current) === $value ? $current : SecretHelper::encrypt($value);
     }
 
     /**
@@ -962,6 +990,22 @@ class ModelWithFields extends Model
     public function getMoney($name): ?Money
     {
         return Money::fromFieldValue($this->getField($name));
+    }
+
+    /**
+     * Decrypted value of a secret field, or null if it is empty or cannot be decrypted.
+     */
+    public function getSecret($name): ?string
+    {
+        return SecretHelper::decrypt($this->getField($name));
+    }
+
+    /**
+     * Value of a secret field to show: a few characters at the ends by the field settings, or null if it is empty.
+     */
+    public function maskedSecret($name): ?string
+    {
+        return SecretHelper::maskStored($this->fieldDefinitions()[$name] ?? null, $this->getField($name));
     }
 
     public function getDateTime($name): ?Carbon

@@ -32,6 +32,7 @@ use Amarenkov\MutableContent\Attributes\Lov\Item as LovItem;
 #[LovItem(Type::TYPE_DATETIME, 'Date and time')]
 #[LovItem(Type::TYPE_MONEY, 'Money')]
 #[LovItem(Type::TYPE_ICON, 'Icon')]
+#[LovItem(Type::TYPE_SECRET, 'Secret')]
 #[LovItem(Type::TYPE_SYSTEM, 'System')]
 class Type extends Lov
 {
@@ -58,5 +59,6 @@ class Type extends Lov
     public const TYPE_DATETIME = 'datetime';
     public const TYPE_MONEY = 'money';
     public const TYPE_ICON = 'icon';
+    public const TYPE_SECRET = 'secret';
     public const TYPE_SYSTEM = 'system';
 }

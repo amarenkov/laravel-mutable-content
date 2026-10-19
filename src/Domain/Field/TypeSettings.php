@@ -37,6 +37,17 @@ class TypeSettings
 
     public const DECIMALS = 'decimals';
 
+    public const VISIBLE_START = 'visible_start';
+
+    public const VISIBLE_END = 'visible_end';
+
+    /**
+     * Characters of a secret shown at the start and at the end by default, and at most.
+     */
+    public const DEFAULT_VISIBLE = 2;
+
+    public const MAX_VISIBLE = 8;
+
     /**
      * Measurement types: zero and negative values are off by default.
      */
@@ -95,16 +106,23 @@ class TypeSettings
             $result[self::DECIMALS] = range(0, Money::MAX_DECIMALS);
         }
 
+        if ($fieldType === FieldType::TYPE_SECRET) {
+            $result[self::VISIBLE_START] = range(0, self::MAX_VISIBLE);
+            $result[self::VISIBLE_END] = range(0, self::MAX_VISIBLE);
+        }
+
         return $result;
     }
 
     /**
-     * Value of a setting that is not set: zero and negative values are allowed for number types and not for measurements.
+     * Value of a setting that is not set: zero and negative values are allowed for number types and not for measurements,
+     * secrets show two characters at each end.
      */
     public static function getDefaultValue(string $fieldType, string $code): mixed
     {
         return match ($code) {
             self::ALLOW_ZERO, self::ALLOW_NEGATIVE => in_array($fieldType, self::SIGNED_TYPES, true),
+            self::VISIBLE_START, self::VISIBLE_END => $fieldType === FieldType::TYPE_SECRET ? self::DEFAULT_VISIBLE : null,
             default => null,
         };
     }
@@ -214,5 +232,21 @@ class TypeSettings
     public static function decimals(Field $field): ?int
     {
         return $field->fieldType === FieldType::TYPE_MONEY ? static::getValue($field, self::DECIMALS) : null;
+    }
+
+    /**
+     * Characters of a secret shown at the start.
+     */
+    public static function visibleStart(Field $field): int
+    {
+        return static::getValue($field, self::VISIBLE_START) ?? static::getDefaultValue($field->fieldType, self::VISIBLE_START) ?? 0;
+    }
+
+    /**
+     * Characters of a secret shown at the end.
+     */
+    public static function visibleEnd(Field $field): int
+    {
+        return static::getValue($field, self::VISIBLE_END) ?? static::getDefaultValue($field->fieldType, self::VISIBLE_END) ?? 0;
     }
 }
