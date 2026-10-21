@@ -7,12 +7,6 @@ parameters:
 			path: src/Database/Seeders/FieldsSeeder.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:setSystemFields\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Database/Seeders/LovsSeeder.php
-
-		-
 			message: '#^Call to function is_subclass_of\(\) with class\-string\<Amarenkov\\MutableContent\\Models\\ModelWithFields\> and ''Illuminate\\\\Database\\\\Eloquent\\\\Model'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -47,18 +41,6 @@ parameters:
 			identifier: new.static
 			count: 1
 			path: src/Models/Log/Entry.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\HasMany\:\:onlyTrashed\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Models/Lov/Lov.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\HasMany\:\:withTrashed\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Models/Lov/Lov.php
 
 		-
 			message: '#^Call to an undefined static method Illuminate\\Support\\Str\:\:toCode\(\)\.$#'

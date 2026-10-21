@@ -7,6 +7,15 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `duration` field type (`Type::TYPE_DURATION`) and the `Duration` value object: whole seconds, entered and shown in seconds, minutes or hours (`display_unit`), `clock()` formats `H:MM:SS`. Zero and negative durations are off by default. `getDuration()` reads the value.
+- `format` type setting of `text`: `plain` (default) or `markdown` (`TypeSettings::format()`, `isMarkdown()`), for interfaces to render and edit the value as Markdown.
+
+### Fixed
+
+- PHPStan: `Lov::items()` is typed, so `LovsSeeder` passes the analysis again.
+
 ## [0.7.10] - 2026-10-19
 
 ### Fixed

@@ -106,6 +106,11 @@ class RuleHelper
                     array_push($rules, ...static::getSignRules($field));
                     break;
 
+                case FieldType::TYPE_DURATION:
+                    $rules[] = 'numeric';
+                    array_push($rules, ...static::getSignRules($field));
+                    break;
+
                 case FieldType::TYPE_DATETIME:
                     $rules[] = 'date';
                     break;

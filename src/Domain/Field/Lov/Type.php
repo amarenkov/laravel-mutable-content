@@ -28,6 +28,7 @@ use Amarenkov\MutableContent\Attributes\Lov\Item as LovItem;
 #[LovItem(Type::TYPE_LENGTH, 'Length')]
 #[LovItem(Type::TYPE_AREA, 'Area')]
 #[LovItem(Type::TYPE_VOLUME, 'Volume')]
+#[LovItem(Type::TYPE_DURATION, 'Duration')]
 #[LovItem(Type::TYPE_DATE, 'Date')]
 #[LovItem(Type::TYPE_DATETIME, 'Date and time')]
 #[LovItem(Type::TYPE_MONEY, 'Money')]
@@ -55,6 +56,7 @@ class Type extends Lov
     public const TYPE_LENGTH = 'length';
     public const TYPE_AREA = 'area';
     public const TYPE_VOLUME = 'volume';
+    public const TYPE_DURATION = 'duration';
     public const TYPE_DATE = 'date';
     public const TYPE_DATETIME = 'datetime';
     public const TYPE_MONEY = 'money';

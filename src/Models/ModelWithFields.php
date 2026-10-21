@@ -49,6 +49,7 @@ use Amarenkov\MutableContent\Models\Log\ModelLogContext;
 
 use Amarenkov\MutableContent\ValueObjects\Area;
 use Amarenkov\MutableContent\ValueObjects\Density;
+use Amarenkov\MutableContent\ValueObjects\Duration;
 use Amarenkov\MutableContent\ValueObjects\FieldValue;
 use Amarenkov\MutableContent\ValueObjects\Length;
 use Amarenkov\MutableContent\ValueObjects\Money;
@@ -82,6 +83,7 @@ class ModelWithFields extends Model
         FieldType::TYPE_LENGTH,
         FieldType::TYPE_AREA,
         FieldType::TYPE_VOLUME,
+        FieldType::TYPE_DURATION,
     ];
 
     // static
@@ -578,6 +580,10 @@ class ModelWithFields extends Model
             $value = (int)$value;
         }
 
+        if ($field && $field->fieldType === FieldType::TYPE_DURATION && is_numeric($value)) {
+            $value = (int)round((float)$value);
+        }
+
         if ($field && $field->fieldType === FieldType::TYPE_DATE && $value instanceof DateTimeInterface) {
             $value = $value->format('Y-m-d');
         }
@@ -985,6 +991,11 @@ class ModelWithFields extends Model
     public function getVolume($name): ?Volume
     {
         return Volume::fromFieldValue($this->getField($name));
+    }
+
+    public function getDuration($name): ?Duration
+    {
+        return Duration::fromFieldValue($this->getField($name));
     }
 
     public function getMoney($name): ?Money

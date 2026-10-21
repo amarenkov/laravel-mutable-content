@@ -155,6 +155,9 @@ class Lov extends ModelWithFields
     }
     
     // public
+    /**
+     * @return HasMany<Item, $this>
+     */
     public function items(): HasMany
     {
         return $this->hasMany(Item::class, Item::FIELD_LOV_ID);

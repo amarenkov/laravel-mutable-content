@@ -12,6 +12,8 @@ use Amarenkov\MutableContent\Domain\Field\Lov\Type;
 
 use Amarenkov\MutableContent\Models\Lov\Currency;
 
+use Amarenkov\MutableContent\ValueObjects\Duration;
+
 use Amarenkov\MutableContent\Attributes\Class\Label as ClassLabel;
 use Amarenkov\MutableContent\Attributes\Field\Common\Code as FieldCode;
 
@@ -45,6 +47,12 @@ class Record extends ModelWithFields
 
     #[CFAType(Type::TYPE_DATETIME), CFALabel('Started at')]
     public const FIELD_STARTED_AT = 'started_at';
+
+    #[CFAType(Type::TYPE_DURATION), CFALabel('Estimate'), CFATypeSettings([TypeSettings::DISPLAY_UNIT => Duration::UNIT_HOUR])]
+    public const FIELD_ESTIMATE = 'estimate';
+
+    #[CFAType(Type::TYPE_TEXT), CFALabel('Notes'), CFATypeSettings([TypeSettings::FORMAT => TypeSettings::FORMAT_MARKDOWN])]
+    public const FIELD_NOTES = 'notes';
 
     #[CFAType(Type::TYPE_MONEY), CFALabel('Price')]
     public const FIELD_PRICE = 'price';

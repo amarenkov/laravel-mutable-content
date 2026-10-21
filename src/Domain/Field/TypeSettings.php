@@ -11,6 +11,7 @@ use Amarenkov\MutableContent\Domain\LovRegistry;
 use Amarenkov\MutableContent\Models\Lov\Currency;
 
 use Amarenkov\MutableContent\ValueObjects\Area;
+use Amarenkov\MutableContent\ValueObjects\Duration;
 use Amarenkov\MutableContent\ValueObjects\HasUnits;
 use Amarenkov\MutableContent\ValueObjects\Length;
 use Amarenkov\MutableContent\ValueObjects\Money;
@@ -41,6 +42,14 @@ class TypeSettings
 
     public const VISIBLE_END = 'visible_end';
 
+    public const FORMAT = 'format';
+
+    public const FORMAT_PLAIN = 'plain';
+
+    public const FORMAT_MARKDOWN = 'markdown';
+
+    public const FORMATS = [self::FORMAT_PLAIN, self::FORMAT_MARKDOWN];
+
     /**
      * Characters of a secret shown at the start and at the end by default, and at most.
      */
@@ -58,6 +67,7 @@ class TypeSettings
         FieldType::TYPE_VOLUME,
         FieldType::TYPE_DENSITY,
         FieldType::TYPE_SURFACE_DENSITY,
+        FieldType::TYPE_DURATION,
     ];
 
     /**
@@ -106,6 +116,10 @@ class TypeSettings
             $result[self::DECIMALS] = range(0, Money::MAX_DECIMALS);
         }
 
+        if ($fieldType === FieldType::TYPE_TEXT) {
+            $result[self::FORMAT] = self::FORMATS;
+        }
+
         if ($fieldType === FieldType::TYPE_SECRET) {
             $result[self::VISIBLE_START] = range(0, self::MAX_VISIBLE);
             $result[self::VISIBLE_END] = range(0, self::MAX_VISIBLE);
@@ -123,6 +137,7 @@ class TypeSettings
         return match ($code) {
             self::ALLOW_ZERO, self::ALLOW_NEGATIVE => in_array($fieldType, self::SIGNED_TYPES, true),
             self::VISIBLE_START, self::VISIBLE_END => $fieldType === FieldType::TYPE_SECRET ? self::DEFAULT_VISIBLE : null,
+            self::FORMAT => $fieldType === FieldType::TYPE_TEXT ? self::FORMAT_PLAIN : null,
             default => null,
         };
     }
@@ -139,6 +154,7 @@ class TypeSettings
             FieldType::TYPE_LENGTH => Length::class,
             FieldType::TYPE_AREA => Area::class,
             FieldType::TYPE_VOLUME => Volume::class,
+            FieldType::TYPE_DURATION => Duration::class,
             default => null,
         };
     }
@@ -248,5 +264,18 @@ class TypeSettings
     public static function visibleEnd(Field $field): int
     {
         return static::getValue($field, self::VISIBLE_END) ?? static::getDefaultValue($field->fieldType, self::VISIBLE_END) ?? 0;
+    }
+
+    /**
+     * Markup of a text field value: plain text by default or Markdown.
+     */
+    public static function format(Field $field): string
+    {
+        return static::getValue($field, self::FORMAT) ?? static::getDefaultValue($field->fieldType, self::FORMAT) ?? self::FORMAT_PLAIN;
+    }
+
+    public static function isMarkdown(Field $field): bool
+    {
+        return static::format($field) === self::FORMAT_MARKDOWN;
     }
 }

@@ -94,7 +94,7 @@ Blade and Livewire application.
 - **Field types.** `string`, `text`, `bool`, `int`, `float`, `money`, `date`, `datetime`,
   `address`, `icon`, `secret`, `lov` (a list of values), `lov_item` (an item of a list), `object` (a
   reference to an object of another class), `weight`, `length`, `area`, `volume`, `density`,
-  `surface_density` and `system`. The type drives the validation rule, the form component and
+  `surface_density`, `duration` and `system`. The type drives the validation rule, the form component and
   the table column. Number and measurement fields have the `allow_negative` and `allow_zero`
   settings (on for numbers, off for measurements by default).
 - **Money.** A `money` field stores an amount and a currency code:
@@ -111,11 +111,15 @@ Blade and Livewire application.
   `visible_end` settings, two by default, a short secret is masked entirely.
   `$account->getSecret('api_key')` returns the text, `maskedSecret('api_key')` the mask. Setting the same text again keeps the stored
   value, so the record does not become dirty; an empty string removes the value.
-- **Value objects for measurements.** `Weight`, `Length`, `Area`, `Volume`, `Density` and
-  `SurfaceDensity` store values in base units (kg, m, m², m³, kg/m³, kg/m²), support
+- **Value objects for measurements.** `Weight`, `Length`, `Area`, `Volume`, `Density`,
+  `SurfaceDensity` and `Duration` store values in base units (kg, m, m², m³, kg/m³, kg/m², whole
+  seconds), support
   arithmetic, tolerant comparison and formatting. Assign one directly
   (`$item->weight = Weight::fromGrams(500)`) and read it back with `$item->getWeight('weight')`.
-  The display unit is a per-field setting.
+  The display unit is a per-field setting: a `duration` field such as an estimate is entered and
+  shown in hours or minutes, `getDuration('estimate')->clock()` gives `1:30:00`.
+- **Markdown text.** The `format` setting of a `text` field is `plain` (default) or `markdown`;
+  `TypeSettings::isMarkdown($field)` tells the interface to render and edit it as Markdown.
 - **Fields of LOV items.** A field is bound to a class or to one list, so the items of a list
   (material types, for example) get fields of their own.
 - **Transparent access.** `$project->code` reads the value from JSON as if it were a regular
