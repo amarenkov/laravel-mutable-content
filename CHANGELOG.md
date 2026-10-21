@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-10-21
+
 ### Added
 
 - `duration` field type (`Type::TYPE_DURATION`) and the `Duration` value object: whole seconds, entered and shown in seconds, minutes or hours (`display_unit`), `clock()` formats `H:MM:SS`. Zero and negative durations are off by default. `getDuration()` reads the value.
@@ -253,7 +255,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.10...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.11...HEAD
+[0.7.11]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.7...v0.7.8
