@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.12] - 2026-11-03
+
 ### Changed
 
 - A job on the `sync` queue connection no longer flushes the cached field definitions, LOVs and log context: it runs inside the current process, so the caches stay valid and the log context of the request is kept.
@@ -260,7 +262,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.11...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.12...HEAD
+[0.7.12]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.8...v0.7.9
