@@ -7,6 +7,11 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A job on the `sync` queue connection no longer flushes the cached field definitions, LOVs and log context: it runs inside the current process, so the caches stay valid and the log context of the request is kept.
+- Field usages are turned into definitions faster: each usage reads its values once instead of on every attribute.
+
 ## [0.7.11] - 2026-10-21
 
 ### Added

@@ -226,21 +226,24 @@ class Usage extends ModelWithFields
 
     public function toDomainField() : DomainField
     {
-        $field = new DomainField(
-            $this->field->fields[DomainField::COMMON_CODE_CODE],
-            $this->field->fields[DomainField::CODE_FIELD_TYPE]
-        )
-            ->label(@$this->field->fields[DomainField::COMMON_CODE_LABEL])
-            ->lovCode(@$this->field->fields[DomainField::CODE_LOV_CODE])
-            ->objectClass($this->field->fields[DomainField::CODE_OBJECT_CLASS] ?? null)
-            ->typeSettings($this->field->fields[DomainField::CODE_FIELD_TYPE_SETTINGS] ?? []);
+        $fieldValues = $this->field->fields;
+        $usageValues = $this->fields;
 
-        $field->addUsage(new DomainFieldUsage((string)$this->{self::CODE_SCOPE})
-            ->label($this->{self::CODE_LABEL})
-            ->isRequired($this->{self::CODE_IS_REQUIRED} ?? false)
-            ->isImmutable($this->{self::CODE_IS_IMMUTABLE} ?? false)
-            ->isImmutableForSystemObjects($this->{self::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS} ?? false)
-            ->typeSettings($this->{self::CODE_FIELD_TYPE_SETTINGS} ?? [])
+        $field = new DomainField(
+            $fieldValues[DomainField::COMMON_CODE_CODE],
+            $fieldValues[DomainField::CODE_FIELD_TYPE]
+        )
+            ->label($fieldValues[DomainField::COMMON_CODE_LABEL] ?? null)
+            ->lovCode($fieldValues[DomainField::CODE_LOV_CODE] ?? null)
+            ->objectClass($fieldValues[DomainField::CODE_OBJECT_CLASS] ?? null)
+            ->typeSettings($fieldValues[DomainField::CODE_FIELD_TYPE_SETTINGS] ?? []);
+
+        $field->addUsage(new DomainFieldUsage((string)($usageValues[self::CODE_SCOPE] ?? ''))
+            ->label($usageValues[self::CODE_LABEL] ?? null)
+            ->isRequired($usageValues[self::CODE_IS_REQUIRED] ?? false)
+            ->isImmutable($usageValues[self::CODE_IS_IMMUTABLE] ?? false)
+            ->isImmutableForSystemObjects($usageValues[self::CODE_IS_IMMUTABLE_FOR_SYSTEM_OBJECTS] ?? false)
+            ->typeSettings($usageValues[self::CODE_FIELD_TYPE_SETTINGS] ?? [])
         );
 
         return $field;

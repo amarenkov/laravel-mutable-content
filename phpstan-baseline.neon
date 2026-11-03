@@ -33,7 +33,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$fields\.$#'
 			identifier: property.notFound
-			count: 4
+			count: 1
 			path: src/Models/Field/Usage.php
 
 		-

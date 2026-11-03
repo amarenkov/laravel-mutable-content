@@ -77,7 +77,11 @@ class MutableContentServiceProvider extends ServiceProvider
             $this->app->make(LogContext::class)->clear();
         };
 
-        Event::listen(JobProcessing::class, $flush);
+        Event::listen(JobProcessing::class, function (JobProcessing $event) use ($flush) {
+            if ($event->connectionName !== 'sync') {
+                $flush();
+            }
+        });
         Event::listen('Laravel\Octane\Events\RequestReceived', $flush);
     }
 

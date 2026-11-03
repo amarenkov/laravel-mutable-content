@@ -2,7 +2,9 @@
 
 namespace Amarenkov\MutableContent\Tests\Feature\Models;
 
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -60,6 +62,26 @@ class MetadataCacheTest extends FeatureTestCase
         $this->assertArrayNotHasKey('note', $record);
         $this->assertArrayHasKey('note', $owner);
         $this->assertArrayNotHasKey('comment', $owner);
+    }
+
+    public function test_queued_jobs_reload_the_usages_and_sync_ones_keep_them(): void
+    {
+        $this->bindNewField('comment', Record::class);
+
+        DB::enableQueryLog();
+
+        Record::getFieldDefinitions();
+
+        event(new JobProcessing('sync', $this->createStub(Job::class)));
+
+        Record::getFieldDefinitions();
+
+        $this->assertCount(1, $this->queriesTo('fields_usage'));
+
+        event(new JobProcessing('database', $this->createStub(Job::class)));
+
+        $this->assertArrayHasKey('comment', Record::getFieldDefinitions());
+        $this->assertCount(2, $this->queriesTo('fields_usage'));
     }
 
     public function test_definitions_do_not_share_fields_between_scope_sets(): void
