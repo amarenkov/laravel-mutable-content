@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-04
+
 ### Added
 
 - Fields and the change log on any table: `$table->mutableFields()`, `Schema::addLog($table, columns: [...])`, `Schema::refreshLog()`, `Schema::dropLog()`; traits `HasMutableFields` and `HasChangeLog`, interface `Contracts\MutableModel`. `ModelWithFields` is now these two traits with `SoftDeletes`.
@@ -288,7 +290,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.13...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.13...v0.8.0
 [0.7.13]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.12...v0.7.13
 [0.7.12]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.10...v0.7.11
