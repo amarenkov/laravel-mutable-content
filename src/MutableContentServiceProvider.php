@@ -32,6 +32,7 @@ use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Database\Log\LogContext;
 
+use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 use Amarenkov\MutableContent\Helpers\SchemaHelper;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
@@ -96,6 +97,8 @@ class MutableContentServiceProvider extends ServiceProvider
             SchemaHelper::migrationsEnded();
 
             ModelWithFields::flushExtractedFields();
+
+            FieldCodeHelper::flushReserved();
         });
     }
 

@@ -9,6 +9,7 @@ use Amarenkov\MutableContent\Domain\MutableClassRegistry;
 
 use Amarenkov\MutableContent\Tests\Fixtures\Lovs\RecordStatus;
 use Amarenkov\MutableContent\Tests\Fixtures\Lovs\TicketKind;
+use Amarenkov\MutableContent\Tests\Fixtures\Models\Member;
 use Amarenkov\MutableContent\Tests\Fixtures\Models\OwnedTicket;
 use Amarenkov\MutableContent\Tests\Fixtures\Models\Owner;
 use Amarenkov\MutableContent\Tests\Fixtures\Models\Record;
@@ -22,7 +23,8 @@ class FixturesServiceProvider extends ServiceProvider
             ->add(Owner::class)
             ->add(Record::class)
             ->add(Ticket::class)
-            ->add(OwnedTicket::class);
+            ->add(OwnedTicket::class)
+            ->add(Member::class);
 
         $this->app->make(LovRegistry::class)
             ->addClass(RecordStatus::class)

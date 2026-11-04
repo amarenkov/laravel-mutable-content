@@ -113,14 +113,14 @@ class MetadataCacheTest extends FeatureTestCase
         $key = DB::connection()->getName().':'.$this->tableOf(Owner::class);
 
         $this->assertArrayHasKey($key, Cache::get(SchemaHelper::CACHE_KEY));
-        $this->assertSame(Owner::getExtractedFields(), Cache::get(SchemaHelper::CACHE_KEY)[$key]);
+        $this->assertSame(Owner::getExtractedFields(), Cache::get(SchemaHelper::CACHE_KEY)[$key]['generated']);
     }
 
     public function test_generated_columns_are_read_from_the_cache(): void
     {
         $key = DB::connection()->getName().':'.$this->tableOf(Owner::class);
 
-        Cache::forever(SchemaHelper::CACHE_KEY, [$key => ['code' => 'varchar(7)']]);
+        Cache::forever(SchemaHelper::CACHE_KEY, [$key => ['generated' => ['code' => 'varchar(7)'], 'plain' => []]]);
 
         $this->assertSame(['code' => 7], Owner::getFieldMaxLengths());
     }
@@ -129,7 +129,7 @@ class MetadataCacheTest extends FeatureTestCase
     {
         $key = DB::connection()->getName().':'.$this->tableOf(Owner::class);
 
-        Cache::forever(SchemaHelper::CACHE_KEY, [$key => ['code' => 'varchar(7)']]);
+        Cache::forever(SchemaHelper::CACHE_KEY, [$key => ['generated' => ['code' => 'varchar(7)'], 'plain' => []]]);
 
         $this->assertSame(['code' => 7], Owner::getFieldMaxLengths());
 

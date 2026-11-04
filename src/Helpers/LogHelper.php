@@ -7,9 +7,12 @@ use InvalidArgumentException;
 
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Casts\Json;
+use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Log;
+
+use Amarenkov\MutableContent\Contracts\MutableModel;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
@@ -20,11 +23,10 @@ use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as SchemaBuilder;
 
-use Amarenkov\MutableContent\Models\ModelWithFields;
 use Amarenkov\MutableContent\ValueObjects\Money;
 
 /**
- * Reads the change log written by Schema::createWithLog() triggers.
+ * Reads the change log written by the triggers of Schema::addLog() and Schema::createWithLog().
  */
 class LogHelper
 {
@@ -48,6 +50,7 @@ class LogHelper
     public const ACTION_UPDATED = 'updated';
     public const ACTION_DELETED = 'deleted';
     public const ACTION_RESTORED = 'restored';
+    public const ACTION_FORCE_DELETED = 'force_deleted';
 
     public const ACTION_EVENT = 'event';
 
@@ -64,7 +67,7 @@ class LogHelper
 
     // static
     /**
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model> $class
      */
     public static function getLogsTable(string $class): string
     {
@@ -76,7 +79,7 @@ class LogHelper
     /**
      * Log entries of the class with object_class; combine classes with union.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model> $class
      */
     public static function query(string $class): QueryBuilder
     {
@@ -104,7 +107,7 @@ class LogHelper
      * An update without changes keeps its fields and gets the error status for review.
      * Parallel runs skip each other's entries.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model> $class
      * @return int Processed entries.
      */
     public static function compress(string $class, int $limit = 10000, int $chunkSize = 500): int
@@ -166,7 +169,7 @@ class LogHelper
     /**
      * Delete entries older than the date, in chunks of separate statements.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model> $class
      * @return int Deleted entries.
      */
     public static function prune(string $class, DateTimeInterface $before, int $chunkSize = 10000): int
@@ -208,12 +211,12 @@ class LogHelper
     /**
      * Human-readable changes, labeled by the current class field definitions.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model> $class
      * @return array<string>
      */
     public static function describeChanges(string $class, Changes $changes): array
     {
-        $fields = class_exists($class) ? $class::getFieldDefinitions() : [];
+        $fields = is_subclass_of($class, MutableModel::class) ? $class::getFieldDefinitions() : [];
 
         $result = [];
 

@@ -20,6 +20,10 @@ class Blueprint
             ]);
         });
 
+        BaseBlueprint::macro('mutableFields', function () {
+            return $this->jsonb('fields')->default('{}');
+        });
+
         BaseBlueprint::macro('fieldsUpdatedAt', function () {
             return $this->timestamp('updated_at')->useCurrent();
         });

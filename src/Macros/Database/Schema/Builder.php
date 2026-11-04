@@ -17,6 +17,11 @@ use Amarenkov\MutableContent\Helpers\LogHelper;
 
 class Builder
 {
+    // const
+    public const LOG_TRIGGERS = ['log_after_insert', 'log_after_update', 'log_after_delete'];
+
+    protected const LOG_COMMENT_COLUMNS = 'columns';
+
     // protected
     public static function getLogsTableName($table, ?Connection $connection = null)
     {
@@ -24,14 +29,25 @@ class Builder
     }
 
     /**
-     * Create the log functions and triggers of the table. Recreate them after renaming the table.
+     * Create the log functions and triggers of the table by its current columns. Recreate them after renaming the table
+     * or changing its key, fields, deleted_at or logged columns.
      */
     public static function createLogTriggers(Connection $connection, string $table): void
     {
         DatabaseHelper::driver($connection);
 
+        $table = DatabaseHelper::tableName($table, $connection);
+
+        $key = static::logKeyColumn($connection, $table);
+        $columns = static::loggedColumns($connection, $table);
+
+        $present = array_column($connection->getSchemaBuilder()->getColumns($table), 'name');
+
+        $hasFields = in_array(DatabaseHelper::FIELDS_COLUMN, $present, true);
+        $hasDeletedAt = in_array(DatabaseHelper::DELETED_AT_COLUMN, $present, true);
+
         if (DatabaseHelper::isMariaDb($connection)) {
-            static::createMariaDbLogTriggers($connection, $table);
+            static::createMariaDbLogTriggers($connection, $table, $key, $columns, $hasFields, $hasDeletedAt);
 
             return;
         }
@@ -39,6 +55,20 @@ class Builder
         $logsTable = static::getLogsTableName($table, $connection);
 
         $context = LogContext::sqlExpressions($connection);
+
+        $grammar = $connection->getQueryGrammar();
+
+        $wrappedKey = $grammar->wrap($key);
+
+        $newSnapshot = static::pgsqlLogSnapshot($connection, 'nd', $columns, $hasFields);
+        $oldSnapshot = static::pgsqlLogSnapshot($connection, 'od', $columns, $hasFields);
+
+        $softDeleteCases = $hasDeletedAt ? "
+                        WHEN nd.deleted_at IS NOT NULL AND od.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
+                        WHEN nd.deleted_at IS NULL AND od.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'" : '';
+
+        $softDeleteCondition = $hasDeletedAt ? ' OR
+                    (nd.deleted_at IS NULL) <> (od.deleted_at IS NULL)' : '';
 
         $connection->statement("
             CREATE OR REPLACE FUNCTION {$logsTable}_log_after_update()
@@ -53,23 +83,20 @@ class Builder
                     transaction_id
                 )
                 SELECT
-                    nd.id,
+                    nd.{$wrappedKey},
                     CASE
-                        WHEN od.id IS NULL THEN '".LogHelper::ACTION_CREATED."'
-                        WHEN nd.deleted_at IS NOT NULL AND od.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
-                        WHEN nd.deleted_at IS NULL AND od.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'
+                        WHEN od.{$wrappedKey} IS NULL THEN '".LogHelper::ACTION_CREATED."'{$softDeleteCases}
                         ELSE '".LogHelper::ACTION_UPDATED."'
                     END,
-                    od.fields,
-                    nd.fields,
+                    {$oldSnapshot},
+                    {$newSnapshot},
                     {$context[LogContext::DATA]},
                     {$context[LogContext::TRANSACTION_ID]}
                 FROM new_data nd
-                LEFT JOIN old_data od ON nd.id = od.id
+                LEFT JOIN old_data od ON nd.{$wrappedKey} = od.{$wrappedKey}
                 WHERE
-                    od.id IS NULL OR
-                    nd.fields IS DISTINCT FROM od.fields OR
-                    (nd.deleted_at IS NULL) <> (od.deleted_at IS NULL);
+                    od.{$wrappedKey} IS NULL OR
+                    {$newSnapshot} IS DISTINCT FROM {$oldSnapshot}{$softDeleteCondition};
 
                 RETURN NULL;
             END;
@@ -88,12 +115,36 @@ class Builder
                     transaction_id
                 )
                 SELECT
-                    nd.id,
+                    nd.{$wrappedKey},
                     '".LogHelper::ACTION_CREATED."',
-                    nd.fields,
+                    {$newSnapshot},
                     {$context[LogContext::DATA]},
                     {$context[LogContext::TRANSACTION_ID]}
                 FROM new_data nd;
+
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql
+        ");
+
+        $connection->statement("
+            CREATE OR REPLACE FUNCTION {$logsTable}_log_after_delete()
+            returns trigger AS $$
+            BEGIN
+                INSERT INTO {$logsTable} (
+                    entity_id,
+                    action,
+                    fields_old,
+                    data,
+                    transaction_id
+                )
+                SELECT
+                    od.{$wrappedKey},
+                    '".LogHelper::ACTION_FORCE_DELETED."',
+                    {$oldSnapshot},
+                    {$context[LogContext::DATA]},
+                    {$context[LogContext::TRANSACTION_ID]}
+                FROM old_data od;
 
                 RETURN NULL;
             END;
@@ -115,54 +166,319 @@ class Builder
             FOR EACH STATEMENT
             EXECUTE FUNCTION {$logsTable}_log_after_update()
         ");
+
+        $connection->statement("
+            CREATE OR REPLACE TRIGGER log_after_delete
+            AFTER DELETE ON {$table}
+            REFERENCING OLD TABLE AS old_data
+            FOR EACH STATEMENT
+            EXECUTE FUNCTION {$logsTable}_log_after_delete()
+        ");
+    }
+
+    /**
+     * Fields and logged columns of a row as a JSON expression of a PostgreSQL trigger.
+     *
+     * @param array<string> $columns
+     */
+    protected static function pgsqlLogSnapshot(Connection $connection, string $row, array $columns, bool $hasFields): string
+    {
+        $fields = $row.'.'.DatabaseHelper::FIELDS_COLUMN;
+
+        if (!$columns) {
+            return $hasFields ? $fields : "'{}'::jsonb";
+        }
+
+        $grammar = $connection->getQueryGrammar();
+
+        $pairs = array_map(fn ($column) => $connection->escape($column).', '.$row.'.'.$grammar->wrap($column), $columns);
+
+        $object = 'jsonb_build_object('.implode(', ', $pairs).')';
+
+        return $hasFields ? "(coalesce({$fields}, '{}'::jsonb) || {$object})" : $object;
+    }
+
+    /**
+     * Fields and logged columns of a row as a JSON expression of a MariaDB trigger.
+     *
+     * @param array<string> $columns
+     */
+    protected static function mariaDbLogSnapshot(Connection $connection, string $row, array $columns, bool $hasFields): string
+    {
+        $fields = $row.'.'.DatabaseHelper::FIELDS_COLUMN;
+
+        if (!$columns) {
+            return $hasFields ? $fields : "'{}'";
+        }
+
+        $grammar = $connection->getQueryGrammar();
+
+        $pairs = array_map(fn ($column) => $connection->escape($column).', '.$row.'.'.$grammar->wrap($column), $columns);
+
+        $object = 'JSON_OBJECT('.implode(', ', $pairs).')';
+
+        return $hasFields ? "JSON_MERGE_PATCH(COALESCE({$fields}, '{}'), {$object})" : $object;
     }
 
     /**
      * MariaDB has no statement triggers with transition tables: rows are logged one by one.
      * Existing log triggers of the table are replaced.
+     *
+     * @param array<string> $columns
      */
-    protected static function createMariaDbLogTriggers(Connection $connection, string $table): void
+    protected static function createMariaDbLogTriggers(Connection $connection, string $table, string $key, array $columns, bool $hasFields, bool $hasDeletedAt): void
     {
-        $table = DatabaseHelper::tableName($table, $connection);
         $logsTable = static::getLogsTableName($table, $connection);
 
         $grammar = $connection->getQueryGrammar();
 
         $wrappedTable = $grammar->wrapTable($table);
         $wrappedLogsTable = $grammar->wrapTable($logsTable);
+        $wrappedKey = $grammar->wrap($key);
 
         $context = implode(', ', LogContext::sqlExpressions($connection));
 
+        $newSnapshot = static::mariaDbLogSnapshot($connection, 'NEW', $columns, $hasFields);
+        $oldSnapshot = static::mariaDbLogSnapshot($connection, 'OLD', $columns, $hasFields);
+
+        $changed = "NOT JSON_EQUALS({$oldSnapshot}, {$newSnapshot})";
+
+        if ($hasFields && !$columns) {
+            $changed = "OLD.fields IS NULL OR NEW.fields IS NULL OR {$changed}";
+        }
+
+        $updateAction = $hasDeletedAt ? "CASE
+                            WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
+                            WHEN NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'
+                            ELSE '".LogHelper::ACTION_UPDATED."'
+                        END" : "'".LogHelper::ACTION_UPDATED."'";
+
+        $softDeleteCondition = $hasDeletedAt ? '
+                    OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL)' : '';
+
         static::dropMariaDbLogTriggers($connection, $table);
 
-        [$afterInsert, $afterUpdate] = static::mariaDbLogTriggerNames($table);
+        [$afterInsert, $afterUpdate, $afterDelete] = static::mariaDbLogTriggerNames($table);
 
         $connection->unprepared("
             CREATE TRIGGER {$grammar->wrap($afterInsert)} AFTER INSERT ON {$wrappedTable} FOR EACH ROW
             INSERT INTO {$wrappedLogsTable} (entity_id, action, fields_new, data, transaction_id)
-            VALUES (NEW.id, '".LogHelper::ACTION_CREATED."', NEW.fields, {$context})
+            VALUES (NEW.{$wrappedKey}, '".LogHelper::ACTION_CREATED."', {$newSnapshot}, {$context})
         ");
 
         $connection->unprepared("
             CREATE TRIGGER {$grammar->wrap($afterUpdate)} AFTER UPDATE ON {$wrappedTable} FOR EACH ROW
             BEGIN
-                IF OLD.fields IS NULL OR NEW.fields IS NULL OR NOT JSON_EQUALS(OLD.fields, NEW.fields)
-                    OR (NEW.deleted_at IS NULL) <> (OLD.deleted_at IS NULL) THEN
+                IF {$changed}{$softDeleteCondition} THEN
                     INSERT INTO {$wrappedLogsTable} (entity_id, action, fields_old, fields_new, data, transaction_id)
                     VALUES (
-                        NEW.id,
-                        CASE
-                            WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN '".LogHelper::ACTION_DELETED."'
-                            WHEN NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN '".LogHelper::ACTION_RESTORED."'
-                            ELSE '".LogHelper::ACTION_UPDATED."'
-                        END,
-                        OLD.fields,
-                        NEW.fields,
+                        NEW.{$wrappedKey},
+                        {$updateAction},
+                        {$oldSnapshot},
+                        {$newSnapshot},
                         {$context}
                     );
                 END IF;
             END
         ");
+
+        $connection->unprepared("
+            CREATE TRIGGER {$grammar->wrap($afterDelete)} AFTER DELETE ON {$wrappedTable} FOR EACH ROW
+            INSERT INTO {$wrappedLogsTable} (entity_id, action, fields_old, data, transaction_id)
+            VALUES (OLD.{$wrappedKey}, '".LogHelper::ACTION_FORCE_DELETED."', {$oldSnapshot}, {$context})
+        ");
+    }
+
+    /**
+     * Single-column primary key of the table, or its id column when it has no primary key.
+     */
+    protected static function logKeyColumn(Connection $connection, string $table): string
+    {
+        $schema = $connection->getSchemaBuilder();
+
+        foreach ($schema->getIndexes($table) as $index) {
+            if (!$index['primary']) {
+                continue;
+            }
+
+            if (count($index['columns']) !== 1) {
+                throw new LogicException("Table {$table} cannot be logged: its primary key has several columns.");
+            }
+
+            return $index['columns'][0];
+        }
+
+        if (!in_array('id', array_column($schema->getColumns($table), 'name'), true)) {
+            throw new LogicException("Table {$table} cannot be logged: it has no primary key.");
+        }
+
+        return 'id';
+    }
+
+    /**
+     * Columns logged besides the fields, kept in the comment of the log table.
+     *
+     * @return array<string>
+     */
+    public static function loggedColumns(Connection $connection, string $table): array
+    {
+        $logsTable = static::getLogsTableName($table, $connection);
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            $comment = $connection->scalar(
+                'select table_comment from information_schema.tables where table_schema = database() and table_name = ?',
+                [$logsTable]
+            );
+        } else {
+            $comment = $connection->scalar("select obj_description(to_regclass(?), 'pg_class')", [$logsTable]);
+        }
+
+        return json_decode((string)$comment, true)[self::LOG_COMMENT_COLUMNS] ?? [];
+    }
+
+    /**
+     * @param array<string> $columns
+     */
+    protected static function saveLoggedColumns(Connection $connection, string $table, array $columns): void
+    {
+        $logsTable = static::getLogsTableName($table, $connection);
+
+        $comment = $connection->escape($columns ? json_encode([self::LOG_COMMENT_COLUMNS => $columns]) : '');
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            $connection->statement('ALTER TABLE '.$connection->getQueryGrammar()->wrapTable($logsTable).' COMMENT = '.$comment);
+        } else {
+            $connection->statement("COMMENT ON TABLE {$logsTable} IS {$comment}");
+        }
+    }
+
+    /**
+     * @param array<string> $columns
+     */
+    protected static function checkLoggedColumns(Connection $connection, string $table, array $columns): void
+    {
+        $present = array_column($connection->getSchemaBuilder()->getColumns($table), 'name');
+
+        foreach ($columns as $column) {
+            if (!in_array($column, $present, true)) {
+                throw new LogicException("Table {$table} has no column {$column} to log.");
+            }
+
+            if ($column === DatabaseHelper::FIELDS_COLUMN) {
+                throw new LogicException("Column {$column} of table {$table} is logged without being listed.");
+            }
+        }
+    }
+
+    /**
+     * Create the log table and the triggers of an existing table; history starts now.
+     *
+     * @param array<string> $columns columns logged besides the fields
+     */
+    public static function addLog(BaseBuilder $schema, string $table, array $columns = []): void
+    {
+        $connection = $schema->getConnection();
+
+        $table = DatabaseHelper::tableName($table, $connection);
+
+        static::checkLoggedColumns($connection, $table, $columns);
+
+        $key = static::logKeyColumn($connection, $table);
+
+        $keyType = null;
+
+        foreach ($schema->getColumns($table) as $column) {
+            if ($column['name'] === $key) {
+                $keyType = $column;
+            }
+        }
+
+        $schema->createSchema(DatabaseHelper::LOGS_SCHEMA);
+
+        $logsTable = static::getLogsTableName($table, $connection);
+
+        $schema->create($logsTable, function ($blueprint) use ($connection, $keyType) {
+            $blueprint->bigIncrements('id');
+
+            if (preg_match('/^(tiny|small|medium|big)?int[248]?$|serial/i', $keyType['type_name'])) {
+                $blueprint->unsignedBigInteger('entity_id');
+            } else {
+                $blueprint->rawColumn('entity_id', $keyType['type']);
+            }
+
+            $blueprint->string('action', 16);
+
+            $blueprint->jsonb('fields_old')->nullable();
+            $blueprint->jsonb('fields_new')->nullable();
+            $blueprint->jsonb('fields_changed')->nullable();
+            $blueprint->string('compression_status', 16)->default(LogHelper::COMPRESSION_PENDING);
+
+            $blueprint->timestampTz('date')->useCurrent();
+
+            $blueprint->jsonb('data')->nullable();
+            $blueprint->unsignedBigInteger('user_id')->nullable()->storedAs(static::logUserIdExpression($connection));
+
+            $blueprint->unsignedBigInteger('transaction_id')->nullable();
+
+            $blueprint->index('entity_id');
+            $blueprint->index('date');
+            $blueprint->index('user_id');
+            $blueprint->index('compression_status');
+            $blueprint->index('transaction_id');
+        });
+
+        if ($columns) {
+            static::saveLoggedColumns($connection, $table, $columns);
+        }
+
+        static::createLogTriggers($connection, $table);
+    }
+
+    /**
+     * Rebuild the log triggers by the current columns of the table.
+     *
+     * @param ?array<string> $columns new list of logged columns; the current one is kept when null
+     */
+    public static function refreshLog(BaseBuilder $schema, string $table, ?array $columns = null): void
+    {
+        $connection = $schema->getConnection();
+
+        $table = DatabaseHelper::tableName($table, $connection);
+
+        if ($columns !== null) {
+            static::checkLoggedColumns($connection, $table, $columns);
+            static::saveLoggedColumns($connection, $table, $columns);
+        }
+
+        static::createLogTriggers($connection, $table);
+    }
+
+    /**
+     * Drop the log triggers, functions and table; the table itself stays.
+     */
+    public static function dropLog(BaseBuilder $schema, string $table): void
+    {
+        $connection = $schema->getConnection();
+
+        $table = DatabaseHelper::tableName($table, $connection);
+
+        $logsTable = static::getLogsTableName($table, $connection);
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            static::dropMariaDbLogTriggers($connection, $table);
+        } else {
+            foreach (self::LOG_TRIGGERS as $trigger) {
+                $connection->statement("DROP TRIGGER IF EXISTS {$trigger} ON {$table}");
+            }
+        }
+
+        $schema->dropIfExists($logsTable);
+
+        if (!DatabaseHelper::isMariaDb($connection)) {
+            foreach (self::LOG_TRIGGERS as $trigger) {
+                $connection->statement("DROP FUNCTION IF EXISTS {$logsTable}_{$trigger}()");
+            }
+        }
     }
 
     /**
@@ -195,14 +511,11 @@ class Builder
     }
 
     /**
-     * @return array{string, string}
+     * @return array<string>
      */
     protected static function mariaDbLogTriggerNames(string $table): array
     {
-        return [
-            DatabaseHelper::identifier($table, 'log_after_insert'),
-            DatabaseHelper::identifier($table, 'log_after_update'),
-        ];
+        return array_map(fn ($trigger) => DatabaseHelper::identifier($table, $trigger), self::LOG_TRIGGERS);
     }
 
     /**
@@ -297,63 +610,27 @@ class Builder
 
             $this->build($blueprint);
 
-            // logs section
-            $this->createSchema(DatabaseHelper::LOGS_SCHEMA);
-            
-            $logsTable = Builder::getLogsTableName($table, $this->getConnection());
-            
-            $blueprint = tap($this->createBlueprint($logsTable), function ($blueprint) {
-                $blueprint->create();
-
-                $blueprint->bigIncrements('id');
-
-                $blueprint->unsignedBigInteger('entity_id');
-
-                $blueprint->string('action', 16);
-
-                $blueprint->jsonb('fields_old')->nullable();
-                $blueprint->jsonb('fields_new')->nullable();
-                $blueprint->jsonb('fields_changed')->nullable();
-                $blueprint->string('compression_status', 16)->default(LogHelper::COMPRESSION_PENDING);
-
-                $blueprint->timestampTz('date')->useCurrent();
-
-                $blueprint->jsonb('data')->nullable();
-                $blueprint->unsignedBigInteger('user_id')->nullable()->storedAs(Builder::logUserIdExpression($this->getConnection()));
-
-                $blueprint->unsignedBigInteger('transaction_id')->nullable();
-
-                $blueprint->index('entity_id');
-                $blueprint->index('date');
-                $blueprint->index('user_id');
-                $blueprint->index('compression_status');
-                $blueprint->index('transaction_id');
-            });
-
-            $this->build($blueprint);
-
-            Builder::createLogTriggers($this->getConnection(), $table);
+            Builder::addLog($this, $table);
         });
 
         BaseBuilder::macro('dropIfExistsWithLog', function ($table) {
             $table = DatabaseHelper::tableName($table, $this->getConnection());
 
-            $this->build(tap($this->createBlueprint($table), function ($blueprint) {
-                $blueprint->dropIfExists();
-            }));
+            Builder::dropLog($this, $table);
 
-            $logsTable = Builder::getLogsTableName($table, $this->getConnection());
+            $this->dropIfExists($table);
+        });
 
-            $this->build(tap($this->createBlueprint($logsTable), function ($blueprint) {
-                $blueprint->dropIfExists();
-            }));
+        BaseBuilder::macro('addLog', function ($table, array $columns = []) {
+            Builder::addLog($this, $table, $columns);
+        });
 
-            if (DatabaseHelper::isMariaDb($this->getConnection())) {
-                return;
-            }
+        BaseBuilder::macro('refreshLog', function ($table, ?array $columns = null) {
+            Builder::refreshLog($this, $table, $columns);
+        });
 
-            $this->getConnection()->statement("DROP FUNCTION {$logsTable}_log_after_insert()");
-            $this->getConnection()->statement("DROP FUNCTION {$logsTable}_log_after_update()");
+        BaseBuilder::macro('dropLog', function ($table) {
+            Builder::dropLog($this, $table);
         });
 
         BaseBuilder::macro('renameWithLog', function ($from, $to) {
@@ -385,10 +662,10 @@ class Builder
             $fromLogsTable = Builder::getLogsTableName($from, $connection);
             $toLogsTable = Builder::getLogsTableName($to, $connection);
 
-            $connection->statement("DROP TRIGGER log_after_insert ON {$from}");
-            $connection->statement("DROP TRIGGER log_after_update ON {$from}");
-            $connection->statement("DROP FUNCTION {$fromLogsTable}_log_after_insert()");
-            $connection->statement("DROP FUNCTION {$fromLogsTable}_log_after_update()");
+            foreach (Builder::LOG_TRIGGERS as $trigger) {
+                $connection->statement("DROP TRIGGER IF EXISTS {$trigger} ON {$from}");
+                $connection->statement("DROP FUNCTION IF EXISTS {$fromLogsTable}_{$trigger}()");
+            }
 
             $connection->statement("ALTER TABLE {$from} RENAME TO {$toName}");
             $connection->statement("ALTER TABLE {$fromLogsTable} RENAME TO ".explode('.', $toLogsTable, 2)[1]);

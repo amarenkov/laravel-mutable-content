@@ -27,6 +27,10 @@ class DatabaseHelper
 
     public const CREATED_SCHEMA_COMMENT = 'mutable-content';
 
+    public const FIELDS_COLUMN = 'fields';
+
+    public const DELETED_AT_COLUMN = 'deleted_at';
+
     public const IDENTIFIER_MAX_LENGTH = 64;
 
     // static

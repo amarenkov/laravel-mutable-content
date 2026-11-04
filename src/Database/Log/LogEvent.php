@@ -4,13 +4,12 @@ namespace Amarenkov\MutableContent\Database\Log;
 
 use LogicException;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Expression;
 
 use Amarenkov\MutableContent\Domain\Log\LogData;
 
 use Amarenkov\MutableContent\Helpers\LogHelper;
-
-use Amarenkov\MutableContent\Models\ModelWithFields;
 
 /**
  * Event without field changes for the object log (LogHelper::ACTION_EVENT), written by write().
@@ -21,7 +20,7 @@ class LogEvent extends LogData
 {
     // public
     public function __construct(
-        protected ModelWithFields $model,
+        protected Model $model,
         protected string $event,
         array $data = []
     ) {
@@ -36,6 +35,7 @@ class LogEvent extends LogData
             throw new LogicException('Cannot write log of unsaved '.$model::class.' object');
         }
 
+        /** @phpstan-ignore method.notFound */
         $data = array_replace($model->withLogContext()->toArray(), $this->toArray());
         $data[LogData::EVENT] = $this->event;
 

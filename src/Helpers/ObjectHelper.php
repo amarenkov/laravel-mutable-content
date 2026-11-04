@@ -3,11 +3,13 @@
 namespace Amarenkov\MutableContent\Helpers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+use Amarenkov\MutableContent\Contracts\MutableModel;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\MutableClassRegistry;
 
-use Amarenkov\MutableContent\Models\ModelWithFields;
 
 /**
  * Objects referenced by object fields, by id or by code (TypeSettings::LINK_BY_CODE).
@@ -39,7 +41,7 @@ class ObjectHelper
     /**
      * Ids of non-deleted objects with the code, up to $limit. More than one means the code is ambiguous.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      * @return array<int>
      */
     public static function getIdsByCode(string $class, string|int $code, int $limit = 2): array
@@ -57,7 +59,7 @@ class ObjectHelper
     /**
      * Codes of non-deleted objects: code => title; null if there are more than $limit.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      * @return ?array<string, string>
      */
     public static function getCodeOptions(string $class, int $limit = self::OPTIONS_LIMIT): ?array
@@ -89,7 +91,7 @@ class ObjectHelper
     /**
      * Object title: label, else code, else id.
      */
-    public static function getTitle(ModelWithFields $object): string
+    public static function getTitle(MutableModel $object): string
     {
         foreach (self::getTitleCodes($object::class) as $code) {
             $value = $object->getField($code);
@@ -105,7 +107,7 @@ class ObjectHelper
     /**
      * Object title by id; null if missing or deleted.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      */
     public static function getTitleById(string $class, mixed $id): ?string
     {
@@ -117,7 +119,7 @@ class ObjectHelper
     /**
      * Object titles by ids in one query; deleted and missing ones are skipped.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      * @return array<int, string>
      */
     public static function getTitles(string $class, array $ids): array
@@ -131,6 +133,7 @@ class ObjectHelper
         $result = [];
 
         foreach ($class::whereKey($ids)->get() as $object) {
+            /** @var Model&MutableModel $object */
             $result[$object->getKey()] = self::getTitle($object);
         }
 
@@ -140,7 +143,7 @@ class ObjectHelper
     /**
      * Object titles by codes in one query: code => title; deleted and missing ones are skipped.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      * @return array<string, string>
      */
     public static function getTitlesByCodes(string $class, array $codes): array
@@ -168,7 +171,7 @@ class ObjectHelper
     /**
      * Select options: id => title, or code => title with $byCode. Searches by id, label and code.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      * @return array<int, string>
      */
     public static function getOptions(string $class, ?string $search = null, int $limit = self::OPTIONS_LIMIT, bool $byCode = false): array
@@ -207,7 +210,7 @@ class ObjectHelper
     /**
      * Query of non-deleted object codes, for whereIn subqueries.
      *
-     * @param class-string<ModelWithFields> $class
+     * @param class-string<Model&MutableModel> $class
      */
     public static function codesQuery(string $class): Builder
     {

@@ -1,0 +1,1047 @@
+<?php
+
+namespace Amarenkov\MutableContent\Models\Concerns;
+
+use ArrayAccess;
+use ArrayObject;
+use DateTimeInterface;
+use InvalidArgumentException;
+use LogicException;
+use Throwable;
+
+use ReflectionClass;
+
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Carbon;
+
+use Illuminate\Database\Eloquent\Casts\Json;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+
+use Amarenkov\MutableContent\Casts\AsFields;
+use Amarenkov\MutableContent\Casts\ReadOnlyArrayObject;
+
+use Amarenkov\MutableContent\Contracts\MutableModel;
+
+use Amarenkov\MutableContent\Domain\Field\Field;
+use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
+use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\LovRegistry;
+
+use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
+use Amarenkov\MutableContent\Attributes\FieldAttr\Common\ForType as AttributeForType;
+use Amarenkov\MutableContent\Attributes\Lov\ItemField as AttributeLovItemField;
+
+use Amarenkov\MutableContent\Helpers\DatabaseHelper;
+use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
+use Amarenkov\MutableContent\Helpers\FieldDefinitionCache;
+use Amarenkov\MutableContent\Helpers\ObjectHelper;
+use Amarenkov\MutableContent\Helpers\SecretHelper;
+use Amarenkov\MutableContent\Helpers\SchemaHelper;
+
+use Amarenkov\MutableContent\Models\Field\Usage as UsageModel;
+
+use Amarenkov\MutableContent\ValueObjects\Area;
+use Amarenkov\MutableContent\ValueObjects\Density;
+use Amarenkov\MutableContent\ValueObjects\Duration;
+use Amarenkov\MutableContent\ValueObjects\FieldValue;
+use Amarenkov\MutableContent\ValueObjects\Length;
+use Amarenkov\MutableContent\ValueObjects\Money;
+use Amarenkov\MutableContent\ValueObjects\SurfaceDensity;
+use Amarenkov\MutableContent\ValueObjects\Volume;
+use Amarenkov\MutableContent\ValueObjects\Weight;
+
+/**
+ * Typed fields kept in the fields column of the table. The model also implements MutableModel.
+ * A model overriding one of these methods calls it under an alias: PHP keeps the method of the class over the one of a trait.
+ */
+trait HasMutableFields
+{
+    // const
+    public const FIELDS_COLUMN = 'fields';
+
+    public const FIELDS_PATH_PREFIX = 'fields->';
+
+    public const WHERE_FIELD_OPERATORS = ['=', '<>', '!=', '<', '<=', '>', '>='];
+
+    /**
+     * Storage format of a date and time field: UTC, so the values sort and compare as strings.
+     */
+    public const DATETIME_FORMAT = 'Y-m-d\\TH:i:s\\Z';
+
+    protected const NUMERIC_FIELD_TYPES = [
+        FieldType::TYPE_INT,
+        FieldType::TYPE_FLOAT,
+        FieldType::TYPE_WEIGHT,
+        FieldType::TYPE_DENSITY,
+        FieldType::TYPE_SURFACE_DENSITY,
+        FieldType::TYPE_LENGTH,
+        FieldType::TYPE_AREA,
+        FieldType::TYPE_VOLUME,
+        FieldType::TYPE_DURATION,
+    ];
+
+    // static
+    /**
+     * Reset cached field definitions of all classes.
+     */
+    public static function flushFieldDefinitions(): void
+    {
+        FieldDefinitionCache::flush();
+    }
+
+    /**
+     * Reset cached generated columns of all classes.
+     */
+    public static function flushExtractedFields(): void
+    {
+        FieldDefinitionCache::$extractedFields = [];
+    }
+
+    /**
+     * Scope of a field usage bound to this class. Override together with fillFieldUsageFromScope().
+     */
+    public static function fieldUsageScope(UsageModel $usage): string
+    {
+        $mutableClass = (string)$usage->{UsageModel::CODE_MUTABLE_CLASS};
+        $typeCode = $usage->{UsageModel::CODE_TYPE_CODE};
+
+        if ($typeCode !== null && $typeCode !== '') {
+            return UsageModel::makeTypeScope($mutableClass, (string)$typeCode);
+        }
+
+        return UsageModel::makeScope(UsageModel::CODE_MUTABLE_CLASS, $mutableClass);
+    }
+
+    /**
+     * Fill the usage fields from the scope; the inverse of fieldUsageScope().
+     */
+    public static function fillFieldUsageFromScope(UsageModel $usage, string $scope): void
+    {
+        $values = [
+            UsageModel::CODE_MUTABLE_CLASS => UsageModel::getScopeMutableClass($scope),
+            UsageModel::CODE_TYPE_CODE => UsageModel::getScopeTypeCode($scope),
+        ];
+
+        foreach ($values as $code => $value) {
+            if ($usage->{$code} !== $value) {
+                $usage->{$code} = $value;
+            }
+        }
+    }
+
+    /**
+     * Usage scopes of the class when there is no object.
+     *
+     * @return array<string>
+     */
+    public static function getFieldScopes(): array
+    {
+        return [static::getClassScope()];
+    }
+
+    public static function getClassScope(): string
+    {
+        return UsageModel::makeScope(UsageModel::CODE_MUTABLE_CLASS, static::class);
+    }
+
+    /**
+     * Code of the field holding the object type; each type has fields of its own besides the class ones. Null for a class without types.
+     * The field is a LOV item or an object reference, its value is turned into a code by typeCodeOf().
+     */
+    public static function typeField(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Type code of a type field value: the LOV item code, or the code of the referenced object.
+     */
+    public static function typeCodeOf(mixed $value): ?string
+    {
+        $typeField = static::typeField();
+
+        if ($typeField === null || $value === null || $value === '') {
+            return null;
+        }
+
+        $field = static::getFieldDefinitions([static::getClassScope()])[$typeField] ?? null;
+
+        if ($field && $field->fieldType === FieldType::TYPE_OBJECT && $field->objectClass && !TypeSettings::linksByCode($field)) {
+            $object = $field->objectClass::query()->find(ObjectHelper::toId($value));
+
+            return $object instanceof MutableModel && $object->code() !== '' ? $object->code() : null;
+        }
+
+        return is_scalar($value) ? (string)$value : null;
+    }
+
+    /**
+     * Types of the class: type code => label. Empty for a class without types.
+     *
+     * @return array<string, string>
+     */
+    public static function getTypeOptions(): array
+    {
+        $typeField = static::typeField();
+
+        if ($typeField === null) {
+            return [];
+        }
+
+        $field = static::getFieldDefinitions([static::getClassScope()])[$typeField] ?? null;
+
+        if (!$field) {
+            return [];
+        }
+
+        if ($field->fieldType === FieldType::TYPE_LOV_ITEM) {
+            return array_map('strval', app(LovRegistry::class)->getLovItemsOptions($field->lovCode) ?? []);
+        }
+
+        if ($field->fieldType === FieldType::TYPE_OBJECT && $field->objectClass) {
+            $result = [];
+
+            foreach ($field->objectClass::query()->get() as $object) {
+                if ($object instanceof MutableModel && $object->code() !== '') {
+                    $result[$object->code()] = ObjectHelper::getTitle($object);
+                }
+            }
+
+            return $result;
+        }
+
+        return [];
+    }
+
+    /**
+     * Timezone dates and times are entered and shown in (`mutable-content.timezone`, the application one by default); they are stored in UTC.
+     */
+    public static function displayTimezone(): string
+    {
+        return (string)(config('mutable-content.timezone') ?: config('app.timezone'));
+    }
+
+    /**
+     * Date and time field value: a date object or a parsable string, the latter in the display timezone unless it has its own, turned into DATETIME_FORMAT. Other values are kept for the validation to reject.
+     */
+    public static function toDateTimeValue(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->utc()->format(self::DATETIME_FORMAT);
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return $value === '' ? null : $value;
+        }
+
+        try {
+            return Carbon::parse($value, static::displayTimezone())->utc()->format(self::DATETIME_FORMAT);
+        } catch (Throwable) {
+            return $value;
+        }
+    }
+
+    /**
+     * Money field value: an array with an empty amount becomes null, a valid amount a JSON number, only the amount and the currency are kept.
+     * Other values are kept for the validation to reject.
+     */
+    public static function toMoneyValue(mixed $value): mixed
+    {
+        if ($value instanceof ArrayObject) {
+            $value = $value->getArrayCopy();
+        }
+
+        if (!is_array($value)) {
+            return $value === '' ? null : $value;
+        }
+
+        $amount = $value[Money::KEY_AMOUNT] ?? null;
+
+        if ($amount === null || (is_string($amount) && trim($amount) === '')) {
+            return null;
+        }
+
+        if (!Money::isAmount($amount)) {
+            return $value;
+        }
+
+        $amount = Money::toDecimalString($amount);
+
+        return [
+            Money::KEY_AMOUNT => str_contains($amount, '.') ? (float)$amount : (int)$amount,
+            Money::KEY_CURRENCY => $value[Money::KEY_CURRENCY] ?? null,
+        ];
+    }
+
+    public static function getTypeScope(string $typeCode): string
+    {
+        return UsageModel::makeTypeScope((string)UsageModel::getScopeMutableClass(static::getClassScope()), $typeCode);
+    }
+
+    /**
+     * Usage scopes of the objects of a type: the class ones plus the type one.
+     *
+     * @return array<string>
+     */
+    public static function getFieldScopesForType(?string $typeCode): array
+    {
+        $scopes = static::getFieldScopes();
+
+        if ($typeCode !== null && $typeCode !== '') {
+            $scopes[] = static::getTypeScope($typeCode);
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * Field sets unique including soft-deleted rows. An insert matching a deleted row restores it.
+     *
+     * @return array<array<string>>
+     */
+    public static function uniqueFieldSets(): array
+    {
+        return [];
+    }
+
+    /**
+     * Fields extracted to generated columns by fieldExtract(): code => column type.
+     *
+     * @return array<string, string>
+     */
+    public static function getExtractedFields(): array
+    {
+        if (!isset(FieldDefinitionCache::$extractedFields[static::class])) {
+            $model = new static();
+
+            FieldDefinitionCache::$extractedFields[static::class] = SchemaHelper::generatedColumns($model->getConnection(), $model->getTable());
+        }
+
+        return FieldDefinitionCache::$extractedFields[static::class];
+    }
+
+    /**
+     * Max lengths of fields extracted to varchar(N) columns: code => N.
+     *
+     * @return array<string, int>
+     */
+    public static function getFieldMaxLengths(): array
+    {
+        $result = [];
+
+        foreach (static::getExtractedFields() as $code => $type) {
+            if (preg_match('/^(?:character varying|character|varchar|char)\((\d+)\)$/', $type, $matches)) {
+                $result[$code] = (int)$matches[1];
+            }
+        }
+
+        return $result;
+    }
+
+    public static function getSystemFields()
+    {
+        $result = [];
+
+        $reflection = new ReflectionClass(static::class);
+
+        foreach ($reflection->getAttributes() as $attribute) {
+            if (strpos($attribute->getName(), 'Amarenkov\\MutableContent\\Attributes\\Field\\') === 0) {
+                $field = $attribute->newInstance()->toDomainField(static::class);
+
+                $result[$field->code] = $field;
+            }
+        }
+
+        foreach ($reflection->getReflectionConstants() as $reflectionConstant) {
+            if ($reflectionConstant->getAttributes(AttributeLovItemField::class)) {
+                continue;
+            }
+
+            $attrs = FieldAttr::collect($reflectionConstant);
+
+            if ($attrs) {
+                $typeCode = $attrs[AttributeForType::CODE] ?? null;
+
+                if ($typeCode !== null && static::typeField() === null) {
+                    throw new LogicException($reflectionConstant->getValue().' field of '.static::class.' is bound to a type, but the class has no type field');
+                }
+
+                $field = FieldAttr::buildDomainField(static::class, $reflectionConstant->getValue(), $attrs, $typeCode !== null ? static::getTypeScope($typeCode) : null);
+
+                if (@$result[$field->code]) {
+                    throw new LogicException($field->code.' field is already in class '.static::class.' fields list');
+                }
+
+                $result[$field->code] = $field;
+            }
+        }
+
+        foreach ($result as $field) {
+            if ($error = FieldCodeHelper::getErrorForClass($field->code, static::class)) {
+                throw new LogicException($error);
+            }
+        }
+
+        return $result;
+    }
+    
+    /**
+     * Class field definitions for the scopes, getFieldScopes() by default. Cached per scope set.
+     *
+     * @param ?array<string> $scopes
+     */
+    public static function getFieldDefinitions(?array $scopes = null)
+    {
+        $scopes ??= static::getFieldScopes();
+
+        $cacheKey = implode("\n", $scopes);
+
+        if (!isset(FieldDefinitionCache::$definitions[static::class][$cacheKey])) {
+            $definitions = [];
+
+            foreach (static::getSystemFields() as $field) {
+                $usages = array_intersect_key($field->usages, array_flip($scopes));
+
+                if (!$usages) {
+                    continue;
+                }
+
+                $field = clone $field;
+                $field->usages = $usages;
+
+                $definitions[$field->code] = $field;
+            }
+
+            FieldDefinitionCache::$definitions[static::class][$cacheKey] = $definitions;
+
+            try {
+                $usageFields = FieldDefinitionCache::usageFields($scopes);
+
+                if ($usageFields === null) {
+                    FieldDefinitionCache::$cachedWhileLoading[static::class] = static::class;
+
+                    return $definitions;
+                }
+
+                foreach ($usageFields as $field) {
+                    if ($error = FieldCodeHelper::getErrorForClass($field->code, static::class)) {
+                        Log::warning('Mutable content: field skipped. '.$error);
+
+                        continue;
+                    }
+
+                    $existed = $definitions[$field->code] ?? null;
+
+                    if ($existed) {
+                        $existed->absorb($field);
+                    } else {
+                        $definitions[$field->code] = $field;
+                    }
+                }
+            } catch (Throwable $exception) {
+                unset(FieldDefinitionCache::$definitions[static::class][$cacheKey]);
+
+                throw $exception;
+            }
+
+            foreach ($definitions as $field) {
+                $field->applyUsageLabel();
+            }
+
+            FieldDefinitionCache::$definitions[static::class][$cacheKey] = $definitions;
+        }
+
+        return FieldDefinitionCache::$definitions[static::class][$cacheKey];
+    }
+
+    // protected
+    protected function fieldColumn(EloquentBuilder $query, string $code): string
+    {
+        return $query->qualifyColumn(self::FIELDS_COLUMN).'->'.$code;
+    }
+
+    protected function asJson($value, $flags = 0)
+    {
+        return Json::encode($value, $flags | JSON_UNESCAPED_UNICODE);
+    }
+
+    protected function isItField($key)
+    {
+        return key_exists($key, $this->fieldDefinitions());
+    }
+
+    protected function normalizeFieldValue($key, $value)
+    {
+        if ($value instanceof FieldValue) {
+            $value = $value->toFieldValue();
+        }
+
+        $field = $this->fieldDefinitions()[$key] ?? null;
+
+        if ($field && in_array($field->fieldType, [FieldType::TYPE_FLOAT, FieldType::TYPE_WEIGHT, FieldType::TYPE_DENSITY, FieldType::TYPE_SURFACE_DENSITY, FieldType::TYPE_LENGTH, FieldType::TYPE_AREA, FieldType::TYPE_VOLUME], true) && is_numeric($value)) {
+            $value = (float)$value;
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_INT && is_string($value) && filter_var($value, FILTER_VALIDATE_INT) !== false) {
+            $value = (int)$value;
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_DURATION && is_numeric($value)) {
+            $value = (int)round((float)$value);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_DATE && $value instanceof DateTimeInterface) {
+            $value = $value->format('Y-m-d');
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
+            $value = static::toDateTimeValue($value);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_MONEY) {
+            $value = static::toMoneyValue($value);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_SECRET) {
+            $value = $this->toSecretValue($key, $value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Secret field value: a text is encrypted, the text of the current value keeps the current ciphertext, an encrypted value is kept.
+     * Other values are kept for the validation to reject.
+     */
+    protected function toSecretValue(string $key, mixed $value): mixed
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (SecretHelper::isEncrypted($value)) {
+            return $value;
+        }
+
+        $current = $this->getField($key);
+
+        return SecretHelper::decrypt($current) === $value ? $current : SecretHelper::encrypt($value);
+    }
+
+    /**
+     * Current fields as an array. Fails on a saved object loaded without the fields column.
+     */
+    protected function currentFields(): array
+    {
+        if (!array_key_exists(self::FIELDS_COLUMN, $this->attributes)) {
+            if ($this->exists) {
+                throw new LogicException('Cannot change fields of '.static::class.' object loaded without the fields column');
+            }
+
+            return [];
+        }
+
+        $fields = $this->{self::FIELDS_COLUMN};
+
+        return $fields ? $fields->getArrayCopy() : [];
+    }
+
+    protected function writeFields(array $fields)
+    {
+        return parent::setAttribute(self::FIELDS_COLUMN, new ReadOnlyArrayObject($fields, ReadOnlyArrayObject::ARRAY_AS_PROPS));
+    }
+
+    protected function isFieldsColumnKey($key): bool
+    {
+        return $key === self::FIELDS_COLUMN || str_starts_with((string)$key, self::FIELDS_PATH_PREFIX);
+    }
+
+    protected function getDirtyForUpdate()
+    {
+        $dirty = parent::getDirtyForUpdate();
+
+        if (array_key_exists(self::FIELDS_COLUMN, $dirty)) {
+            $expression = $this->fieldsUpdateExpression();
+
+            if ($expression === false) {
+                unset($dirty[self::FIELDS_COLUMN]);
+            } elseif ($expression !== null) {
+                $dirty[self::FIELDS_COLUMN] = $expression;
+            }
+        }
+
+        return $dirty;
+    }
+
+    /**
+     * Update of the changed fields only, so keys written by others meanwhile are kept.
+     * False if no field changed, null to write the whole column.
+     */
+    protected function fieldsUpdateExpression(): Expression|false|null
+    {
+        $original = $this->original[self::FIELDS_COLUMN] ?? null;
+        $current = $this->attributes[self::FIELDS_COLUMN] ?? null;
+
+        $old = $original === null ? [] : Json::decode($original);
+        $new = $current === null ? null : Json::decode($current);
+
+        if (!is_array($old) || !is_array($new)) {
+            return null;
+        }
+
+        $changed = [];
+
+        foreach ($new as $key => $value) {
+            if (!array_key_exists($key, $old) || $old[$key] !== $value) {
+                $changed[$key] = $value;
+            }
+        }
+
+        $removed = array_keys(array_diff_key($old, $new));
+
+        if (!$changed && !$removed) {
+            return false;
+        }
+
+        $connection = $this->getConnection();
+
+        $column = $connection->getQueryGrammar()->wrap(self::FIELDS_COLUMN);
+
+        if (DatabaseHelper::isMariaDb($connection)) {
+            return $this->mariaDbFieldsUpdateExpression($column, $changed, $removed);
+        }
+
+        $sql = 'case when jsonb_typeof('.$column.") = 'object' then ".$column." else '{}'::jsonb end";
+
+        if ($removed) {
+            $sql = '('.$sql.' - array['.implode(', ', array_map(fn ($key) => $connection->escape((string)$key), $removed)).']::text[])';
+        }
+
+        if ($changed) {
+            $sql .= ' || '.$connection->escape($this->asJson((object)$changed)).'::jsonb';
+        }
+
+        return new Expression($sql);
+    }
+
+    protected function mariaDbFieldsUpdateExpression(string $column, array $changed, array $removed): Expression
+    {
+        $connection = $this->getConnection();
+
+        $path = fn ($key) => $connection->escape('$."'.addcslashes((string)$key, '"\\').'"');
+
+        $sql = 'case when json_type('.$column.") = 'OBJECT' then ".$column." else '{}' end";
+
+        if ($removed) {
+            $sql = 'json_remove('.$sql.', '.implode(', ', array_map($path, $removed)).')';
+        }
+
+        if ($changed) {
+            $json = $connection->escape($this->asJson((object)$changed));
+
+            $sql = 'json_set('.$sql.', '.implode(', ', array_map(fn ($key) => $path($key).', json_extract('.$json.', '.$path($key).')', array_keys($changed))).')';
+        }
+
+        return new Expression($sql);
+    }
+
+    protected function findTrashedDuplicate(): ?static
+    {
+        /** @phpstan-ignore function.alreadyNarrowedType */
+        if (!method_exists($this, 'getDeletedAtColumn')) {
+            return null;
+        }
+
+        foreach (static::uniqueFieldSets() as $codes) {
+            $query = static::onlyTrashed();
+
+            foreach ($codes as $code) {
+                $value = $this->getField($code);
+
+                if ($value === null) {
+                    continue 2;
+                }
+
+                $query->where($code, $value);
+            }
+
+            $trashed = $query->orderByDesc($this->getDeletedAtColumn())->first();
+
+            if ($trashed) {
+                return $trashed;
+            }
+        }
+
+        return null;
+    }
+
+    protected function performInsert(EloquentBuilder $query)
+    {
+        $trashed = $this->findTrashedDuplicate();
+
+        if (!$trashed) {
+            return parent::performInsert($query);
+        }
+
+        $fields = array_replace(
+            $trashed->fields ? $trashed->fields->toArray() : [],
+            $this->fields ? $this->fields->toArray() : []
+        );
+
+        $this->classCastCache = [];
+        $this->attributeCastCache = [];
+
+        $this->setRawAttributes($trashed->getAttributes(), true);
+        $this->exists = true;
+
+        $this->writeFields($fields);
+
+        $this->{$this->getDeletedAtColumn()} = null;
+
+        if ($this->fireModelEvent('restoring') === false) {
+            return false;
+        }
+
+        $saved = $this->performUpdate($query);
+
+        if ($saved) {
+            $this->fireModelEvent('restored', false);
+        }
+
+        return $saved;
+    }
+
+    // public
+    public function initializeHasMutableFields(): void
+    {
+        $this->mergeCasts([self::FIELDS_COLUMN => AsFields::class]);
+    }
+
+    /**
+     * Table name; "schema.table" becomes "schema__table" on MariaDB.
+     */
+    public function getTable()
+    {
+        return DatabaseHelper::tableName(parent::getTable(), $this->getConnection());
+    }
+
+    /**
+     * Usage scopes of this object.
+     *
+     * @return array<string>
+     */
+    public function fieldScopes(): array
+    {
+        $typeField = static::typeField();
+
+        return $typeField === null ? static::getFieldScopes() : static::getFieldScopesForType($this->typeCode());
+    }
+
+    /**
+     * Type code of this object, see typeField().
+     */
+    public function typeCode(): ?string
+    {
+        $typeField = static::typeField();
+
+        return $typeField === null ? null : static::typeCodeOf($this->getField($typeField));
+    }
+
+    public function fieldDefinitions(): array
+    {
+        return static::getFieldDefinitions($this->fieldScopes());
+    }
+
+    /**
+     * Where on a field value typed by its definition: numbers and measurements compare as numbers, value objects in base
+     * units, dates as Y-m-d. A field extracted to a column is compared on the column.
+     */
+    public function scopeWhereField(EloquentBuilder $query, string $code, mixed $operator, mixed $value = null, string $boolean = 'and'): EloquentBuilder
+    {
+        if (func_num_args() === 3) {
+            [$value, $operator] = [$operator, '='];
+        }
+
+        if (!in_array($operator, self::WHERE_FIELD_OPERATORS, true)) {
+            throw new InvalidArgumentException('Unsupported operator '.$operator.' for field '.$code);
+        }
+
+        $field = static::getFieldDefinitions()[$code] ?? null;
+
+        if ($value instanceof FieldValue) {
+            $value = $value->toFieldValue();
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
+            $value = static::toDateTimeValue($value);
+        } elseif ($value instanceof DateTimeInterface) {
+            $value = $value->format('Y-m-d');
+        }
+
+        if ($value === null) {
+            return match ($operator) {
+                '=' => $query->whereNull($this->fieldColumn($query, $code), $boolean),
+                '<>', '!=' => $query->whereNotNull($this->fieldColumn($query, $code), $boolean),
+                default => throw new InvalidArgumentException('Operator '.$operator.' cannot compare field '.$code.' with null'),
+            };
+        }
+
+        if (isset(static::getExtractedFields()[$code])) {
+            return $query->where($query->qualifyColumn($code), $operator, $value, $boolean);
+        }
+
+        if ($field && (in_array($field->fieldType, self::NUMERIC_FIELD_TYPES, true) || ($field->fieldType === FieldType::TYPE_OBJECT && !TypeSettings::linksByCode($field)))) {
+            $grammar = $query->getQuery()->getGrammar();
+            $path = $grammar->wrap($this->fieldColumn($query, $code));
+            $number = DatabaseHelper::isMariaDb($this->getConnection()) ? 'cast('.$path.' as double)' : '('.$path.')::numeric';
+
+            return $query->whereRaw($number.' '.$operator.' ?', [$value], $boolean);
+        }
+
+        if ($field && $field->fieldType === FieldType::TYPE_BOOL) {
+            $value = (bool)$value;
+        }
+
+        return $query->where($this->fieldColumn($query, $code), $operator, $value, $boolean);
+    }
+
+    public function scopeOrWhereField(EloquentBuilder $query, string $code, mixed $operator, mixed $value = null): EloquentBuilder
+    {
+        if (func_num_args() === 3) {
+            [$value, $operator] = [$operator, '='];
+        }
+
+        return $this->scopeWhereField($query, $code, $operator, $value, 'or');
+    }
+
+    public function attributesToArray()
+    {
+        $attributes = parent::attributesToArray();
+
+        if (isset($attributes['fields']) && is_array($attributes['fields'])) {
+            foreach ($this->fieldDefinitions() as $code => $field) {
+                if ($field->fieldType === FieldType::TYPE_SYSTEM) {
+                    unset($attributes['fields'][$code]);
+                }
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Replace the given fields, keep the others. A null value removes the field.
+     */
+    public function mergeWithFields($data)
+    {
+        $fields = array_replace($this->currentFields(), $data);
+
+        $fields = array_filter($fields, fn ($value) => $value !== null);
+
+        return $this->writeFields($fields);
+    }
+
+    public function setField($name, $value)
+    {
+        $fields = $this->currentFields();
+
+        $value = $this->normalizeFieldValue($name, $value);
+
+        if ($value === null) {
+            unset($fields[$name]);
+        } else {
+            $fields[$name] = $value;
+        }
+
+        return $this->writeFields($fields);
+    }
+
+    public function getField($name, $default = null)
+    {
+        return $this->fields[$name] ?? $default;
+    }
+
+    public function getWeight($name): ?Weight
+    {
+        return Weight::fromFieldValue($this->getField($name));
+    }
+
+    public function getDensity($name): ?Density
+    {
+        return Density::fromFieldValue($this->getField($name));
+    }
+
+    public function getSurfaceDensity($name): ?SurfaceDensity
+    {
+        return SurfaceDensity::fromFieldValue($this->getField($name));
+    }
+
+    public function getLength($name): ?Length
+    {
+        return Length::fromFieldValue($this->getField($name));
+    }
+
+    public function getArea($name): ?Area
+    {
+        return Area::fromFieldValue($this->getField($name));
+    }
+
+    public function getVolume($name): ?Volume
+    {
+        return Volume::fromFieldValue($this->getField($name));
+    }
+
+    public function getDuration($name): ?Duration
+    {
+        return Duration::fromFieldValue($this->getField($name));
+    }
+
+    public function getMoney($name): ?Money
+    {
+        return Money::fromFieldValue($this->getField($name));
+    }
+
+    /**
+     * Decrypted value of a secret field, or null if it is empty or cannot be decrypted.
+     */
+    public function getSecret($name): ?string
+    {
+        return SecretHelper::decrypt($this->getField($name));
+    }
+
+    /**
+     * Value of a secret field to show: a few characters at the ends by the field settings, or null if it is empty.
+     */
+    public function maskedSecret($name): ?string
+    {
+        return SecretHelper::maskStored($this->fieldDefinitions()[$name] ?? null, $this->getField($name));
+    }
+
+    public function getDateTime($name): ?Carbon
+    {
+        $value = $this->getField($name);
+
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        $date = Carbon::createFromFormat(self::DATETIME_FORMAT, $value, 'UTC');
+
+        return $date ? $date->setTimezone(static::displayTimezone()) : null;
+    }
+
+    public function getDate($name): ?Carbon
+    {
+        $value = $this->getField($name);
+
+        return $value === null ? null : Carbon::createFromFormat('!Y-m-d', $value);
+    }
+
+    public function getAttribute($key)
+    {
+        if (str_starts_with((string)$key, self::FIELDS_PATH_PREFIX)) {
+            return $this->getFieldByPath(substr($key, strlen(self::FIELDS_PATH_PREFIX)));
+        }
+
+        if ($this->isItField($key))
+            return $this->getField($key);
+
+        return parent::getAttribute($key);
+    }
+
+    public function getFieldByPath(string $path, $default = null)
+    {
+        $value = $this->fields;
+
+        foreach (explode('->', $path) as $segment) {
+            if (!($value instanceof ArrayAccess || is_array($value)) || !isset($value[$segment])) {
+                return $default;
+            }
+
+            $value = $value[$segment];
+        }
+
+        return $value;
+    }
+
+    public function isRelation($key)
+    {
+        if (in_array($key, [Field::COMMON_CODE_CODE, Field::COMMON_CODE_LABEL], true)) {
+            return false;
+        }
+
+        return parent::isRelation($key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        if ($this->isFieldsColumnKey($key)) {
+            throw new LogicException('Fields of '.static::class.' cannot be assigned directly, use setField(), fill() or mergeWithFields()');
+        }
+
+        if ($this->isItField($key))
+            return $this->setField($key, $value);
+
+        return parent::setAttribute($key, $value);
+    }
+
+    public function fill(array $attributes)
+    {
+        foreach (array_keys($attributes) as $key) {
+            if ($this->isFieldsColumnKey($key)) {
+                throw new LogicException('Fields of '.static::class.' cannot be filled as a whole, pass field codes as keys');
+            }
+        }
+
+        $keyName = $this->getKeyName();
+
+        if ($this->exists && array_key_exists($keyName, $attributes) && (string)$attributes[$keyName] !== (string)$this->getKey()) {
+            throw new LogicException('Cannot change the key of saved '.static::class.' object by fill()');
+        }
+
+        $not_fields = $attributes;
+
+        for ($pass = 0; $pass < 2 && $not_fields; $pass++) {
+            $fields = [];
+            $rest = [];
+
+            foreach ($not_fields as $key => $value) {
+                if ($this->isItField($key)) {
+                    $fields[$key] = $this->normalizeFieldValue($key, $value);
+                } else {
+                    $rest[$key] = $value;
+                }
+            }
+
+            if (!$fields) {
+                break;
+            }
+
+            $this->mergeWithFields($fields);
+
+            $not_fields = $rest;
+        }
+
+        return parent::fill($not_fields);
+    }
+
+    public function isSystem()
+    {
+        return (bool)$this->getField(Field::COMMON_CODE_IS_SYSTEM);
+    }
+
+    public function code()
+    {
+        return (string)$this->getField(Field::COMMON_CODE_CODE);
+    }
+
+    public function label()
+    {
+        return (string)$this->getField(Field::COMMON_CODE_LABEL);
+    }
+}

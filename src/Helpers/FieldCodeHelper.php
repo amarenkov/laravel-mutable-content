@@ -34,6 +34,11 @@ class FieldCodeHelper
     // static
     protected static array $reservedByClass = [];
 
+    public static function flushReserved(): void
+    {
+        self::$reservedByClass = [];
+    }
+
     /**
      * Field code error regardless of class, or null if the code is valid.
      */
@@ -77,7 +82,7 @@ class FieldCodeHelper
     }
 
     /**
-     * Reserved columns and relations of the class. Relations are detected by a Relation return type.
+     * Reserved columns (all but those generated from fields) and relations of the class. Relations are detected by a Relation return type.
      *
      * @param class-string<ModelWithFields> $class
      * @return array<string>
@@ -107,6 +112,8 @@ class FieldCodeHelper
             if (method_exists($model, 'getDeletedAtColumn')) {
                 $result[] = $model->getDeletedAtColumn();
             }
+
+            array_push($result, ...SchemaHelper::plainColumns($model->getConnection(), $model->getTable()));
         }
 
         foreach (new ReflectionClass($class)->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {

@@ -16,6 +16,8 @@ use Amarenkov\MutableContent\Domain\Field\Lov\Type as DomainLovFieldType;
 
 use Amarenkov\MutableContent\Domain\MutableClassRegistry;
 
+use Amarenkov\MutableContent\Contracts\MutableModel;
+
 use Amarenkov\MutableContent\Helpers\FieldCodeHelper;
 
 use Amarenkov\MutableContent\Models\ModelWithFields;
@@ -174,7 +176,7 @@ class Usage extends ModelWithFields
 
     protected static function scopeClass(?string $mutableClass): string
     {
-        return $mutableClass && class_exists($mutableClass) && is_subclass_of($mutableClass, ModelWithFields::class)
+        return $mutableClass && class_exists($mutableClass) && is_subclass_of($mutableClass, MutableModel::class)
             ? $mutableClass
             : ModelWithFields::class;
     }

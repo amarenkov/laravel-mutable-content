@@ -7,6 +7,21 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fields and the change log on any table: `$table->mutableFields()`, `Schema::addLog($table, columns: [...])`, `Schema::refreshLog()`, `Schema::dropLog()`; traits `HasMutableFields` and `HasChangeLog`, interface `Contracts\MutableModel`. `ModelWithFields` is now these two traits with `SoftDeletes`.
+- The log can hold values of plain columns (`columns:`), next to the fields in `fields_old` and `fields_new`.
+- The log works with any single-column primary key: `entity_id` takes the type of a non-integer key.
+- Hard deletes are logged with the action `force_deleted`, including delete queries (`LogHelper::ACTION_FORCE_DELETED`). New tables get this at once; for an existing one run `Schema::refreshLog()` in a migration.
+
+### Changed
+
+- **Breaking:** a field code cannot be the name of a plain column of the table: a field declared in code throws a `LogicException`, a field from the database is skipped with a warning. Before, the field silently took over the column. Generated columns from `fieldExtract()` are still allowed.
+- **Breaking:** `MutableClassRegistry::add()` accepts only classes implementing `MutableModel`.
+- **Breaking:** the protected static properties of the definition cache moved from `ModelWithFields` to `Helpers\FieldDefinitionCache`.
+- `ModelLogContext` and `LogEvent` take any `Model`; `ObjectHelper::getTitle()` takes a `MutableModel`.
+- The cast of the `fields` column no longer depends on `casts()`, so a model can define its own without calling the parent.
+
 ## [0.7.13] - 2026-11-04
 
 ### Changed

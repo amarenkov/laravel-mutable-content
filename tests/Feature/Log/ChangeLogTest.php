@@ -701,7 +701,7 @@ class ChangeLogTest extends FeatureTestCase
             $triggers = collect(DB::select('select trigger_name from information_schema.triggers where event_object_schema = database() and event_object_table = ?', [$table]))
                 ->map(fn ($row) => array_change_key_case((array)$row)['trigger_name'])->sort()->values()->all();
 
-            $this->assertSame([$table.'_log_after_insert', $table.'_log_after_update'], $triggers);
+            $this->assertSame([$table.'_log_after_delete', $table.'_log_after_insert', $table.'_log_after_update'], $triggers);
         }
     }
 
@@ -724,7 +724,7 @@ class ChangeLogTest extends FeatureTestCase
         Carbon::setTestNow(now()->addDays(2));
 
         $this->artisan('mutable-content:prune-log', ['--days' => 1, '--class' => [Owner::class, 'stdClass']])
-            ->expectsOutput('stdClass is not a mutable class, skipped.')
+            ->expectsOutput('stdClass is not a model, skipped.')
             ->expectsOutput(Owner::class.': 1 entries deleted')
             ->doesntExpectOutputToContain(Record::class)
             ->assertSuccessful();

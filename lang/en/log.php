@@ -6,6 +6,7 @@ return [
         'updated' => 'Updated',
         'deleted' => 'Deleted',
         'restored' => 'Restored',
+        'force_deleted' => 'Deleted permanently',
         'event' => 'Event',
     ],
     'empty' => 'empty',

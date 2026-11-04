@@ -2,9 +2,9 @@
 
 namespace Amarenkov\MutableContent\Models\Log;
 
-use Amarenkov\MutableContent\Domain\Log\LogData;
+use Illuminate\Database\Eloquent\Model;
 
-use Amarenkov\MutableContent\Models\ModelWithFields;
+use Amarenkov\MutableContent\Domain\Log\LogData;
 
 /**
  * Context of the log entry written by the next save() or delete() of the model, kept in the model until a successful write.
@@ -13,7 +13,7 @@ class ModelLogContext extends LogData
 {
     // public
     public function __construct(
-        protected ModelWithFields $model
+        protected Model $model
     ) {
     }
 

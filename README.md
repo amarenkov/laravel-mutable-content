@@ -299,8 +299,8 @@ used. The operators are `=`, `<>`, `!=`, `<`, `<=`, `>` and `>=`.
 
 ## Change log
 
-Database triggers write every insert and update of a table created by `Schema::createWithLog()`
-to its log table: the action (`created`, `updated`, `deleted`, `restored`, or `event` for
+Database triggers write every insert, update and delete of a table created by `Schema::createWithLog()`
+to its log table: the action (`created`, `updated`, `deleted`, `restored`, `force_deleted`, or `event` for
 `logEvent()`), the fields before and after, the log data and the id of the database
 transaction, so entries of one operation can be grouped.
 
@@ -382,6 +382,54 @@ Schedule::command('mutable-content:prune-log --days=1095')->daily();
 Both commands take `--class=` to limit them to some classes (all registered classes by
 default), and the same is available as `LogHelper::compress()` and `LogHelper::prune()`.
 
+## Adding to an existing table
+
+Fields and the change log work separately and on any table with a single-column primary key,
+integer or not. `Schema::createWithLog()` and `ModelWithFields` are a shorthand for the case of a
+new table with everything on.
+
+```php
+Schema::table('customers', function (Blueprint $table) {
+    $table->mutableFields();                                // JSON column fields, default {}
+    $table->fieldExtract('nickname')->type('varchar(50)');  // optional generated column
+});
+
+Schema::addLog('customers', columns: ['name', 'status']);   // optional list of columns to log
+```
+
+```php
+use Illuminate\Database\Eloquent\Model;
+
+use Amarenkov\MutableContent\Contracts\MutableModel;
+use Amarenkov\MutableContent\Models\Concerns\HasChangeLog;
+use Amarenkov\MutableContent\Models\Concerns\HasMutableFields;
+
+#[ClassLabel('Customer')]
+class Customer extends Model implements MutableModel
+{
+    use HasMutableFields;  // the fields
+    use HasChangeLog;      // withLogContext() and logEvent()
+}
+```
+
+Use either part alone: the triggers need no trait, and `HasMutableFields` needs no log.
+`SoftDeletes` is optional; without it `uniqueFieldSets()` restores nothing and the log has no
+`deleted` and `restored` entries. Only a model with `MutableModel` can be added to
+`MutableClassRegistry`; `mutable-content:compress-log` and `mutable-content:prune-log` take any
+other model through `--class`.
+
+The history starts at `addLog()`. Values of the listed columns are logged next to the fields, as
+the database renders them, so dates and booleans look different on PostgreSQL and MariaDB, and on
+MariaDB a JSON column is logged as a string. A field code cannot be the name of a plain column of
+the table.
+
+The triggers are built by the columns the table has at that moment. After changing the key,
+adding `fields` or `deleted_at`, or dropping a logged column, run `Schema::refreshLog('customers')`;
+pass `columns:` to change the list. `Schema::dropLog('customers')` removes the log and keeps the
+table. A class overriding a method of `HasMutableFields` or `HasChangeLog`, such as `save()` or
+`getAttribute()`, replaces it, as PHP does with any trait: import the method under an alias and
+call it.
+
 ## Moving definitions between environments
 
 Fields, their usages, lists of values and items created in the admin panel live in the
@@ -428,9 +476,12 @@ the database label wins and is edited in the admin panel.
   which is a big integer.
 - Concurrent changes of the same field: the last save wins.
 - Class labels in the registry must be unique.
-- Create entity tables with `Schema::createWithLog()` only: it requires the `fields`,
-  `updated_at` and `deleted_at` columns and fails if one is missing.
-- Hard deletes (`forceDelete()`) are not logged.
+- `Schema::createWithLog()` requires the `fields`, `updated_at` and `deleted_at` columns and fails
+  if one is missing; use [`Schema::addLog()`](#adding-to-an-existing-table) for other tables.
+- Rows removed by a foreign key cascade are not logged on MariaDB, where cascades do not fire
+  triggers, and `TRUNCATE` is not logged anywhere.
+- The `entity_id` of a log table takes the type of the key, so a union of `LogHelper::query()` over
+  classes with integer and non-integer keys needs a cast on PostgreSQL.
 - On PostgreSQL `db:wipe` and `migrate:fresh` also drop the `logs` schema and the schemas made by
   `Schema::createSchema()`. A schema that existed before is left alone.
 - Field definitions and lists of values are cached per process. The package flushes the cache
