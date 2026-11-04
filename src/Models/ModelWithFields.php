@@ -87,9 +87,15 @@ class ModelWithFields extends Model
     ];
 
     // static
-    protected static array|bool|null $fieldDefinitions = false;
+    /**
+     * @deprecated No longer used and no longer needs to be redeclared in subclasses.
+     */
+    protected static array|bool|null $fieldDefinitions = null;
 
-    protected static array $fieldDefinitionsCachedIn = [];
+    /**
+     * @var array<class-string, array<string, array<string, Field>>>
+     */
+    protected static array $cachedFieldDefinitions = [];
 
     protected static array $extractedFields = [];
 
@@ -107,11 +113,7 @@ class ModelWithFields extends Model
      */
     public static function flushFieldDefinitions(): void
     {
-        foreach (self::$fieldDefinitionsCachedIn as $class) {
-            $class::$fieldDefinitions = null;
-        }
-
-        self::$fieldDefinitionsCachedIn = [];
+        self::$cachedFieldDefinitions = [];
 
         self::$usageFields = null;
     }
@@ -153,7 +155,7 @@ class ModelWithFields extends Model
                 self::$usageFieldsLoading = false;
 
                 foreach (self::$fieldDefinitionsCachedWhileLoading as $class) {
-                    $class::$fieldDefinitions = null;
+                    unset(self::$cachedFieldDefinitions[$class]);
                 }
 
                 self::$fieldDefinitionsCachedWhileLoading = [];
@@ -470,15 +472,11 @@ class ModelWithFields extends Model
      */
     public static function getFieldDefinitions(?array $scopes = null)
     {
-        if (static::$fieldDefinitions === false) {
-            throw new LogicException('Protected static $fieldDefinitions must be redeclared in '.static::class.' with value null');
-        }
-
         $scopes ??= static::getFieldScopes();
 
         $cacheKey = implode("\n", $scopes);
 
-        if (!isset(static::$fieldDefinitions[$cacheKey])) {
+        if (!isset(self::$cachedFieldDefinitions[static::class][$cacheKey])) {
             $definitions = [];
 
             foreach (static::getSystemFields() as $field) {
@@ -494,8 +492,7 @@ class ModelWithFields extends Model
                 $definitions[$field->code] = $field;
             }
 
-            static::$fieldDefinitions ??= [];
-            static::$fieldDefinitions[$cacheKey] = $definitions;
+            self::$cachedFieldDefinitions[static::class][$cacheKey] = $definitions;
 
             try {
                 $usageFields = static::usageFields($scopes);
@@ -522,7 +519,7 @@ class ModelWithFields extends Model
                     }
                 }
             } catch (Throwable $exception) {
-                unset(static::$fieldDefinitions[$cacheKey]);
+                unset(self::$cachedFieldDefinitions[static::class][$cacheKey]);
 
                 throw $exception;
             }
@@ -531,12 +528,10 @@ class ModelWithFields extends Model
                 $field->applyUsageLabel();
             }
 
-            static::$fieldDefinitions[$cacheKey] = $definitions;
-
-            self::$fieldDefinitionsCachedIn[static::class] = static::class;
+            self::$cachedFieldDefinitions[static::class][$cacheKey] = $definitions;
         }
 
-        return static::$fieldDefinitions[$cacheKey];
+        return self::$cachedFieldDefinitions[static::class][$cacheKey];
     }
 
     // protected

@@ -100,13 +100,6 @@ class ModelWithFieldsTest extends FeatureTestCase
         $this->assertSame(1, Owner::withTrashed()->count());
     }
 
-    public function test_child_class_must_redeclare_field_definitions(): void
-    {
-        $this->expectException(LogicException::class);
-
-        ModelWithFields::getFieldDefinitions();
-    }
-
     public function test_field_max_lengths_come_from_generated_columns(): void
     {
         $this->assertSame(['code' => 20], Owner::getFieldMaxLengths());

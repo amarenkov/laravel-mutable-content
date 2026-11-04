@@ -74,8 +74,6 @@ class Usage extends ModelWithFields
     const CODE_FIELD_TYPE_SETTINGS = DomainField::CODE_FIELD_TYPE_SETTINGS;
 
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function uniqueFieldSets(): array
     {
         return [[self::FIELD_FIELD_ID, self::CODE_SCOPE]];

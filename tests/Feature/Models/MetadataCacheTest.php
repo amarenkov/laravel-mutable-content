@@ -84,6 +84,17 @@ class MetadataCacheTest extends FeatureTestCase
         $this->assertCount(2, $this->queriesTo('fields_usage'));
     }
 
+    public function test_definitions_are_kept_per_class_with_or_without_the_old_redeclaration(): void
+    {
+        $this->bindNewField('comment', Record::class);
+        $this->bindNewField('note', Owner::class);
+
+        $this->assertArrayHasKey('comment', Record::getFieldDefinitions());
+        $this->assertArrayNotHasKey('note', Record::getFieldDefinitions());
+        $this->assertArrayHasKey('note', Owner::getFieldDefinitions());
+        $this->assertArrayNotHasKey('comment', Owner::getFieldDefinitions());
+    }
+
     public function test_definitions_do_not_share_fields_between_scope_sets(): void
     {
         $this->bindNewField('comment', Record::class);

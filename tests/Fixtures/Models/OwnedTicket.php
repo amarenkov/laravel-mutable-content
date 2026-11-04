@@ -25,8 +25,6 @@ class OwnedTicket extends ModelWithFields
     public const FIELD_OWNER_ID = 'owner_id';
 
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function typeField(): ?string
     {
         return self::FIELD_OWNER_ID;

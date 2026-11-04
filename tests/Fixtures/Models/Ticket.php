@@ -31,8 +31,6 @@ class Ticket extends ModelWithFields
     public const FIELD_STEPS = 'steps';
 
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function typeField(): ?string
     {
         return self::FIELD_KIND;

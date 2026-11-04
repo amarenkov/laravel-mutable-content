@@ -47,8 +47,6 @@ class Lov extends ModelWithFields
     // const
     
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function uniqueFieldSets(): array
     {
         return [[DomainField::COMMON_CODE_CODE]];

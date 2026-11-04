@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Subclasses of `ModelWithFields` no longer have to redeclare `$fieldDefinitions`. Existing redeclarations keep working and can be removed.
+
 ## [0.7.12] - 2026-11-03
 
 ### Changed

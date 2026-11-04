@@ -46,8 +46,6 @@ class Item extends ModelWithFields
     const CODE_ICON = DomainLovItem::CODE_ICON;
 
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function uniqueFieldSets(): array
     {
         return [[self::FIELD_LOV_ID, DomainField::COMMON_CODE_CODE]];

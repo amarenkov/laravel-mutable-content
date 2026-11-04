@@ -56,8 +56,6 @@ class Field extends ModelWithFields
     const CODE_FIELD_TYPE_SETTINGS = DomainField::CODE_FIELD_TYPE_SETTINGS;
     
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function uniqueFieldSets(): array
     {
         return [[DomainField::COMMON_CODE_CODE]];

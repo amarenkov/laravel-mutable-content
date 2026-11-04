@@ -4,9 +4,10 @@
 [![Packagist](https://img.shields.io/packagist/v/amarenkov/laravel-mutable-content)](https://packagist.org/packages/amarenkov/laravel-mutable-content)
 ![coverage](https://img.shields.io/badge/coverage-81%25-green)
 
-Laravel models whose set of fields is not fixed by the database schema. Values live in a single
-JSON column (`jsonb` on PostgreSQL), and field definitions come from two sources: PHP attributes in code and records
-in reference tables that an administrator edits by hand.
+Custom fields for Eloquent models, with an audit log written by database triggers. Adding a field
+needs no migration: values live in a single JSON column (`jsonb` on PostgreSQL), and field
+definitions come from two sources: PHP attributes in code and records in reference tables that an
+administrator edits by hand.
 
 One field definition feeds everything at once: Eloquent, validation rules, the admin panel
 ([`-filament`](https://github.com/amarenkov/laravel-mutable-content-filament)), the user-facing
@@ -27,8 +28,6 @@ class Bicycle extends ModelWithFields
 
     #[CFAType(Type::TYPE_WEIGHT), CFALabel('Weight')]
     public const FIELD_WEIGHT = 'weight';
-
-    protected static array|bool|null $fieldDefinitions = null;
 }
 
 $bike = new Bicycle();
@@ -206,9 +205,6 @@ class Project extends ModelWithFields
 {
     #[CFAType(FieldType::TYPE_INT), CFALabel('Priority'), CFAIsRequired]
     const FIELD_PRIORITY = 'priority';
-
-    // required: the base class sets it to false
-    protected static array|bool|null $fieldDefinitions = null;
 }
 ```
 
@@ -322,7 +318,7 @@ app(LogContext::class)->set(new LogData()->user($request->user()?->id)->data(['i
 ```
 
 Data of a nested context is merged over the outer one by top-level keys. The default context is
-cleared before every queue job and Octane request.
+cleared before every queued job (not on the `sync` connection) and Octane request.
 
 Plain SQL outside the application sets the context itself, in the same transaction on
 PostgreSQL:
@@ -412,9 +408,6 @@ the database label wins and is edited in the admin panel.
 
 ## Caveats
 
-- Every `ModelWithFields` subclass **must** redeclare
-  `protected static array|bool|null $fieldDefinitions = null;`, otherwise a `LogicException` is
-  thrown.
 - `withLogContext()` only adds context to the log entry that the next successful `save()` or
   `delete()` writes automatically, it writes nothing by itself; without a comment it keeps the
   comment given before. A save or delete with log context runs in a database transaction.
@@ -427,7 +420,8 @@ the database label wins and is edited in the admin panel.
   `updated_at` and `deleted_at` columns and fails if one is missing.
 - Hard deletes (`forceDelete()`) are not logged.
 - Field definitions and lists of values are cached per process. The package flushes the cache
-  when fields or lists change and before every queue job and Octane request.
+  when fields or lists change and before every queued job (not on the `sync` connection, which runs
+  in the current process) and Octane request.
 
 ## Compared to other packages
 

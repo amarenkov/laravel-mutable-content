@@ -78,9 +78,6 @@ class Record extends ModelWithFields
     #[CFAType(Type::TYPE_SYSTEM), CFALabel('Sync state')]
     public const FIELD_SYNC_STATE = 'sync_state';
 
-    // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     // public
     public function owner(): BelongsTo
     {

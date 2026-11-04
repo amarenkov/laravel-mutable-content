@@ -1,6 +1,6 @@
 {
     "name": "amarenkov/laravel-mutable-content",
-    "description": "Laravel models with user-defined fields: typed JSON fields added without migrations, lists of values, and a trigger-based change log on PostgreSQL and MariaDB.",
+    "description": "Custom fields for Laravel models: typed JSON fields added without migrations, lists of values, and an audit log written by database triggers on PostgreSQL and MariaDB.",
     "type": "library",
     "keywords": [
         "laravel",
