@@ -10,7 +10,9 @@
         "mariadb",
         "dynamic-fields",
         "custom-fields",
+        "custom-attributes",
         "lov",
+        "audit",
         "audit-log",
         "change-log",
         "database-triggers"

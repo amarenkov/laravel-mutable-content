@@ -19,7 +19,9 @@ class InstallCommand extends Command
     // public
     public function handle(): int
     {
-        $this->call('vendor:publish', ['--tag' => 'mutable-content-migrations']);
+        if (!glob(database_path('migrations/*create_fields_tables.php'))) {
+            $this->call('vendor:publish', ['--tag' => 'mutable-content-migrations']);
+        }
 
         if ($this->option('config')) {
             $this->call('vendor:publish', ['--tag' => 'mutable-content-config']);

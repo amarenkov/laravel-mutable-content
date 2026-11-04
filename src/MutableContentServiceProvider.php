@@ -19,6 +19,7 @@ use Amarenkov\MutableContent\Console\PruneLogCommand;
 use Amarenkov\MutableContent\Console\InstallCommand;
 use Amarenkov\MutableContent\Console\ExportDefinitionsCommand;
 use Amarenkov\MutableContent\Console\ImportDefinitionsCommand;
+use Amarenkov\MutableContent\Console\WipeCommand;
 
 use Amarenkov\MutableContent\Macros\Database\Schema\Blueprint as DatabaseSchemaBlueprintMacros;
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as DatabaseSchemaBuilderMacros;
@@ -138,7 +139,7 @@ class MutableContentServiceProvider extends ServiceProvider
             __DIR__.'/../config/mutable-content.php' => config_path('mutable-content.php'),
         ], 'mutable-content-config');
 
-        $this->publishesMigrations([
+        $this->publishes([
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], 'mutable-content-migrations');
 
@@ -163,6 +164,7 @@ class MutableContentServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 ExportDefinitionsCommand::class,
                 ImportDefinitionsCommand::class,
+                WipeCommand::class,
             ]);
 
             $this->scheduleLogCompression();

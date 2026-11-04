@@ -233,6 +233,25 @@ class Builder
         }
     }
 
+    /**
+     * Drop the logs schema and the schemas made by createSchema(), which db:wipe leaves as they are not on the search path.
+     */
+    public static function dropCreatedSchemas(Connection $connection): void
+    {
+        if (DatabaseHelper::isMariaDb($connection)) {
+            return;
+        }
+
+        $schemas = $connection->select(
+            "select nspname from pg_namespace where nspname = ? or obj_description(oid, 'pg_namespace') = ?",
+            [DatabaseHelper::LOGS_SCHEMA, DatabaseHelper::CREATED_SCHEMA_COMMENT]
+        );
+
+        foreach ($schemas as $schema) {
+            $connection->statement('DROP SCHEMA '.$connection->getQueryGrammar()->wrap($schema->nspname).' CASCADE');
+        }
+    }
+
     // public
     public static function add()
     {
@@ -241,7 +260,14 @@ class Builder
                 return;
             }
 
-            $this->getConnection()->statement("CREATE SCHEMA IF NOT EXISTS {$schema};");
+            $connection = $this->getConnection();
+
+            if ($connection->scalar('select count(*) from pg_namespace where nspname = ?', [$schema])) {
+                return;
+            }
+
+            $connection->statement("CREATE SCHEMA IF NOT EXISTS {$schema}");
+            $connection->statement("COMMENT ON SCHEMA {$schema} IS '".DatabaseHelper::CREATED_SCHEMA_COMMENT."'");
         });
 
         BaseBuilder::macro('createWithLog', function ($table, Closure $callback) {

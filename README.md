@@ -229,6 +229,9 @@ Schema::createWithLog('projects.projects', function (Blueprint $table) {
 });
 ```
 
+To roll it back, use `Schema::dropIfExistsWithLog('projects.projects')`: a plain `Schema::drop()`
+leaves the log table and its functions behind.
+
 Usage:
 
 ```php
@@ -239,6 +242,10 @@ $project->save();
 
 $project->priority; // 10, read from JSON like a regular attribute
 ```
+
+Fields read like attributes but are not columns: query them with `whereField()` (see
+[Querying fields](#querying-fields), `where('priority', 10)` is an SQL error), and `toArray()`
+returns them under `fields`, not at the top level. Columns made by `fieldExtract()` are real columns.
 
 Validation rules are built from the same definition:
 
@@ -414,11 +421,18 @@ the database label wins and is edited in the admin panel.
 - Change fields with `setField()`, attribute assignment, `fill()` with field codes as keys or
   `mergeWithFields()`: `$model->fields` is read-only, and changing fields of an object loaded
   without the `fields` column throws a `LogicException`.
+- "Required" and field types are enforced by the validation rules (`RuleHelper`, the admin
+  screens), not on save: a model saved directly can miss a required field or hold a value of
+  another type.
+- `fieldsBase()` creates an integer `id`: reference it with `unsignedInteger()`, not `foreignId()`,
+  which is a big integer.
 - Concurrent changes of the same field: the last save wins.
 - Class labels in the registry must be unique.
 - Create entity tables with `Schema::createWithLog()` only: it requires the `fields`,
   `updated_at` and `deleted_at` columns and fails if one is missing.
 - Hard deletes (`forceDelete()`) are not logged.
+- On PostgreSQL `db:wipe` and `migrate:fresh` also drop the `logs` schema and the schemas made by
+  `Schema::createSchema()`. A schema that existed before is left alone.
 - Field definitions and lists of values are cached per process. The package flushes the cache
   when fields or lists change and before every queued job (not on the `sync` connection, which runs
   in the current process) and Octane request.

@@ -10,6 +10,11 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Subclasses of `ModelWithFields` no longer have to redeclare `$fieldDefinitions`. Existing redeclarations keep working and can be removed.
+- The migrations are published as `0001_01_01_000100_create_fields_tables.php` and `0001_01_01_000101_create_lovs_tables.php`, so on an empty database they run before the migrations of the application. An application that has already published them keeps its files: `mutable-content:install` no longer publishes over them, and do not run `vendor:publish --tag=mutable-content-migrations` again.
+
+### Fixed
+
+- `db:wipe` and `migrate:fresh` on PostgreSQL no longer leave the `logs` schema and the schemas made by `Schema::createSchema()`, which made the next migration fail with "already exists". A schema made by an earlier version is not marked: drop it by hand or run `COMMENT ON SCHEMA <schema> IS 'mutable-content'`.
 
 ## [0.7.12] - 2026-11-03
 

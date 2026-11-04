@@ -25,6 +25,8 @@ class DatabaseHelper
 
     public const LOGS_SCHEMA = 'logs';
 
+    public const CREATED_SCHEMA_COMMENT = 'mutable-content';
+
     public const IDENTIFIER_MAX_LENGTH = 64;
 
     // static
