@@ -7,6 +7,8 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-06
+
 ### Fixed
 
 - `mergeWithFields()` normalizes values like `setField()`: a secret field is encrypted (it was stored as plain text).
@@ -311,7 +313,8 @@ Migrations of existing tables are not provided. For every table created with `Sc
 
 Initial release.
 
-[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.13...v0.8.0
 [0.7.13]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.12...v0.7.13
 [0.7.12]: https://github.com/amarenkov/laravel-mutable-content/compare/v0.7.11...v0.7.12

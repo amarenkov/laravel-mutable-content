@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml/badge.svg)](https://github.com/amarenkov/laravel-mutable-content/actions/workflows/tests.yml)
 [![Packagist](https://img.shields.io/packagist/v/amarenkov/laravel-mutable-content)](https://packagist.org/packages/amarenkov/laravel-mutable-content)
-![coverage](https://img.shields.io/badge/coverage-81%25-green)
+![coverage](https://img.shields.io/badge/coverage-84%25-green)
 
 Custom fields for Eloquent models, with an audit log written by database triggers. Adding a field
 needs no migration: values live in a single JSON column (`jsonb` on PostgreSQL), and field
