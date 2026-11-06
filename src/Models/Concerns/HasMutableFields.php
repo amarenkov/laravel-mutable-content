@@ -26,6 +26,7 @@ use Amarenkov\MutableContent\Contracts\MutableModel;
 use Amarenkov\MutableContent\Domain\Field\Field;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\Field\Types\FieldTypes;
 use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Attributes\FieldAttr\FieldAttr;
@@ -68,18 +69,6 @@ trait HasMutableFields
      * Storage format of a date and time field: UTC, so the values sort and compare as strings.
      */
     public const DATETIME_FORMAT = 'Y-m-d\\TH:i:s\\Z';
-
-    protected const NUMERIC_FIELD_TYPES = [
-        FieldType::TYPE_INT,
-        FieldType::TYPE_FLOAT,
-        FieldType::TYPE_WEIGHT,
-        FieldType::TYPE_DENSITY,
-        FieldType::TYPE_SURFACE_DENSITY,
-        FieldType::TYPE_LENGTH,
-        FieldType::TYPE_AREA,
-        FieldType::TYPE_VOLUME,
-        FieldType::TYPE_DURATION,
-    ];
 
     // static
     /**
@@ -456,6 +445,13 @@ trait HasMutableFields
     }
 
     // protected
+    /**
+     * Type code of the current type field value: finding it may take a query, and every attribute read needs it.
+     *
+     * @var ?array{value: mixed, code: ?string}
+     */
+    protected ?array $typeCodeCache = null;
+
     protected function fieldColumn(EloquentBuilder $query, string $code): string
     {
         return $query->qualifyColumn(self::FIELDS_COLUMN).'->'.$code;
@@ -464,6 +460,63 @@ trait HasMutableFields
     protected function asJson($value, $flags = 0)
     {
         return Json::encode($value, $flags | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Definition of a field for a query: of the class or, for a class with types, of any of its types.
+     */
+    protected static function fieldDefinitionForQuery(string $code): ?Field
+    {
+        $field = static::getFieldDefinitions()[$code] ?? null;
+
+        if ($field || static::typeField() === null) {
+            return $field;
+        }
+
+        foreach (array_keys(static::getTypeOptions()) as $typeCode) {
+            $field = static::getFieldDefinitions(static::getFieldScopesForType((string)$typeCode))[$code] ?? null;
+
+            if ($field) {
+                return $field;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The fields column as a value object, read without the magic of the model: the definitions depend on it.
+     */
+    protected function fieldsValue(): mixed
+    {
+        return array_key_exists(self::FIELDS_COLUMN, $this->attributes) ? parent::getAttribute(self::FIELDS_COLUMN) : null;
+    }
+
+    /**
+     * Normalized values merged over the current fields. The type field goes first: it decides the definitions of the others.
+     */
+    protected function normalizeFieldValues(array $data): array
+    {
+        $typeField = static::typeField();
+
+        if ($typeField !== null && array_key_exists($typeField, $data)) {
+            $this->writeMergedFields([$typeField => $this->normalizeFieldValue($typeField, $data[$typeField])]);
+        }
+
+        foreach ($data as $key => $value) {
+            $data[$key] = $this->normalizeFieldValue($key, $value);
+        }
+
+        return $data;
+    }
+
+    protected function writeMergedFields(array $data)
+    {
+        $fields = array_replace($this->currentFields(), $data);
+
+        $fields = array_filter($fields, fn ($value) => $value !== null);
+
+        return $this->writeFields($fields);
     }
 
     protected function isItField($key)
@@ -479,58 +532,7 @@ trait HasMutableFields
 
         $field = $this->fieldDefinitions()[$key] ?? null;
 
-        if ($field && in_array($field->fieldType, [FieldType::TYPE_FLOAT, FieldType::TYPE_WEIGHT, FieldType::TYPE_DENSITY, FieldType::TYPE_SURFACE_DENSITY, FieldType::TYPE_LENGTH, FieldType::TYPE_AREA, FieldType::TYPE_VOLUME], true) && is_numeric($value)) {
-            $value = (float)$value;
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_INT && is_string($value) && filter_var($value, FILTER_VALIDATE_INT) !== false) {
-            $value = (int)$value;
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_DURATION && is_numeric($value)) {
-            $value = (int)round((float)$value);
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_DATE && $value instanceof DateTimeInterface) {
-            $value = $value->format('Y-m-d');
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
-            $value = static::toDateTimeValue($value);
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_MONEY) {
-            $value = static::toMoneyValue($value);
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_SECRET) {
-            $value = $this->toSecretValue($key, $value);
-        }
-
-        return $value;
-    }
-
-    /**
-     * Secret field value: a text is encrypted, the text of the current value keeps the current ciphertext, an encrypted value is kept.
-     * Other values are kept for the validation to reject.
-     */
-    protected function toSecretValue(string $key, mixed $value): mixed
-    {
-        if (!is_string($value)) {
-            return $value;
-        }
-
-        if ($value === '') {
-            return null;
-        }
-
-        if (SecretHelper::isEncrypted($value)) {
-            return $value;
-        }
-
-        $current = $this->getField($key);
-
-        return SecretHelper::decrypt($current) === $value ? $current : SecretHelper::encrypt($value);
+        return $field ? FieldTypes::for($field->fieldType)->normalize($value, $this, $key) : $value;
     }
 
     /**
@@ -546,7 +548,7 @@ trait HasMutableFields
             return [];
         }
 
-        $fields = $this->{self::FIELDS_COLUMN};
+        $fields = $this->fieldsValue();
 
         return $fields ? $fields->getArrayCopy() : [];
     }
@@ -749,7 +751,17 @@ trait HasMutableFields
     {
         $typeField = static::typeField();
 
-        return $typeField === null ? null : static::typeCodeOf($this->getField($typeField));
+        if ($typeField === null) {
+            return null;
+        }
+
+        $value = $this->getField($typeField);
+
+        if (!$this->typeCodeCache || $this->typeCodeCache['value'] !== $value) {
+            $this->typeCodeCache = ['value' => $value, 'code' => static::typeCodeOf($value)];
+        }
+
+        return $this->typeCodeCache['code'];
     }
 
     public function fieldDefinitions(): array
@@ -771,17 +783,15 @@ trait HasMutableFields
             throw new InvalidArgumentException('Unsupported operator '.$operator.' for field '.$code);
         }
 
-        $field = static::getFieldDefinitions()[$code] ?? null;
+        $field = static::fieldDefinitionForQuery($code);
 
         if ($value instanceof FieldValue) {
             $value = $value->toFieldValue();
         }
 
-        if ($field && $field->fieldType === FieldType::TYPE_DATETIME) {
-            $value = static::toDateTimeValue($value);
-        } elseif ($value instanceof DateTimeInterface) {
-            $value = $value->format('Y-m-d');
-        }
+        $type = FieldTypes::for($field->fieldType ?? FieldType::TYPE_UNDEFINED);
+
+        $value = $type->queryValue($value);
 
         if ($value === null) {
             return match ($operator) {
@@ -795,16 +805,12 @@ trait HasMutableFields
             return $query->where($query->qualifyColumn($code), $operator, $value, $boolean);
         }
 
-        if ($field && (in_array($field->fieldType, self::NUMERIC_FIELD_TYPES, true) || ($field->fieldType === FieldType::TYPE_OBJECT && !TypeSettings::linksByCode($field)))) {
+        if ($field && $type->comparesAsNumber($field)) {
             $grammar = $query->getQuery()->getGrammar();
             $path = $grammar->wrap($this->fieldColumn($query, $code));
             $number = DatabaseHelper::isMariaDb($this->getConnection()) ? 'cast('.$path.' as double)' : '('.$path.')::numeric';
 
             return $query->whereRaw($number.' '.$operator.' ?', [$value], $boolean);
-        }
-
-        if ($field && $field->fieldType === FieldType::TYPE_BOOL) {
-            $value = (bool)$value;
         }
 
         return $query->where($this->fieldColumn($query, $code), $operator, $value, $boolean);
@@ -835,15 +841,11 @@ trait HasMutableFields
     }
 
     /**
-     * Replace the given fields, keep the others. A null value removes the field.
+     * Replace the given fields, keep the others. A null value removes the field. Values are normalized as by setField().
      */
     public function mergeWithFields($data)
     {
-        $fields = array_replace($this->currentFields(), $data);
-
-        $fields = array_filter($fields, fn ($value) => $value !== null);
-
-        return $this->writeFields($fields);
+        return $this->writeMergedFields($this->normalizeFieldValues($data));
     }
 
     public function setField($name, $value)
@@ -863,7 +865,7 @@ trait HasMutableFields
 
     public function getField($name, $default = null)
     {
-        return $this->fields[$name] ?? $default;
+        return $this->fieldsValue()[$name] ?? $default;
     }
 
     public function getWeight($name): ?Weight
@@ -956,7 +958,7 @@ trait HasMutableFields
 
     public function getFieldByPath(string $path, $default = null)
     {
-        $value = $this->fields;
+        $value = $this->fieldsValue();
 
         foreach (explode('->', $path) as $segment) {
             if (!($value instanceof ArrayAccess || is_array($value)) || !isset($value[$segment])) {
@@ -1022,7 +1024,7 @@ trait HasMutableFields
                 break;
             }
 
-            $this->mergeWithFields($fields);
+            $this->writeMergedFields($fields);
 
             $not_fields = $rest;
         }

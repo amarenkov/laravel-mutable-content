@@ -22,7 +22,7 @@ class Builder
 
     protected const LOG_COMMENT_COLUMNS = 'columns';
 
-    // protected
+    // static
     public static function getLogsTableName($table, ?Connection $connection = null)
     {
         return DatabaseHelper::logsTableName($table, $connection);
@@ -684,23 +684,6 @@ class Builder
             ]);
 
             Builder::createLogTriggers($connection, $to);
-        });
-
-        BaseBuilder::macro('upParseTimestamptz', function ($table) {
-            if (DatabaseHelper::isMariaDb($this->getConnection())) {
-                throw new LogicException('parse_timestamptz() is available on PostgreSQL only');
-            }
-
-            $this->getConnection()->statement("
-                CREATE OR REPLACE FUNCTION parse_timestamptz(text)
-                RETURNS timestamptz
-                IMMUTABLE
-                STRICT
-                LANGUAGE sql
-                AS $$
-                    SELECT $1::timestamptz;
-                $$;
-            ");
         });
     }
 }

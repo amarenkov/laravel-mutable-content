@@ -6,17 +6,7 @@ use ArrayObject;
 use InvalidArgumentException;
 
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
-use Amarenkov\MutableContent\Domain\LovRegistry;
-
-use Amarenkov\MutableContent\Models\Lov\Currency;
-
-use Amarenkov\MutableContent\ValueObjects\Area;
-use Amarenkov\MutableContent\ValueObjects\Duration;
-use Amarenkov\MutableContent\ValueObjects\HasUnits;
-use Amarenkov\MutableContent\ValueObjects\Length;
-use Amarenkov\MutableContent\ValueObjects\Money;
-use Amarenkov\MutableContent\ValueObjects\Volume;
-use Amarenkov\MutableContent\ValueObjects\Weight;
+use Amarenkov\MutableContent\Domain\Field\Types\FieldTypes;
 
 /**
  * Field type settings. Usage settings override field settings.
@@ -87,45 +77,7 @@ class TypeSettings
      */
     public static function getAllowedValues(string $fieldType): array
     {
-        if ($fieldType === FieldType::TYPE_LOV_ITEM) {
-            return [self::ALLOW_UNLISTED_CODES => [true, false]];
-        }
-
-        if ($fieldType === FieldType::TYPE_OBJECT) {
-            return [
-                self::LINK_BY_CODE => [true, false],
-                self::ALLOW_UNLISTED_CODES => [true, false],
-            ];
-        }
-
-        $result = [];
-
-        $unitClass = static::getUnitClass($fieldType);
-
-        if ($unitClass) {
-            $result[self::DISPLAY_UNIT] = $unitClass::units();
-        }
-
-        if (in_array($fieldType, self::ALLOW_ZERO_TYPES, true) || in_array($fieldType, self::SIGNED_TYPES, true)) {
-            $result[self::ALLOW_NEGATIVE] = [true, false];
-            $result[self::ALLOW_ZERO] = [true, false];
-        }
-
-        if ($fieldType === FieldType::TYPE_MONEY) {
-            $result[self::CURRENCY] = array_map('strval', array_keys(app(LovRegistry::class)->getLovItemsOptions(Currency::CODE)));
-            $result[self::DECIMALS] = range(0, Money::MAX_DECIMALS);
-        }
-
-        if ($fieldType === FieldType::TYPE_TEXT) {
-            $result[self::FORMAT] = self::FORMATS;
-        }
-
-        if ($fieldType === FieldType::TYPE_SECRET) {
-            $result[self::VISIBLE_START] = range(0, self::MAX_VISIBLE);
-            $result[self::VISIBLE_END] = range(0, self::MAX_VISIBLE);
-        }
-
-        return $result;
+        return FieldTypes::for($fieldType)->settings();
     }
 
     /**
@@ -134,29 +86,25 @@ class TypeSettings
      */
     public static function getDefaultValue(string $fieldType, string $code): mixed
     {
-        return match ($code) {
-            self::ALLOW_ZERO, self::ALLOW_NEGATIVE => in_array($fieldType, self::SIGNED_TYPES, true),
-            self::VISIBLE_START, self::VISIBLE_END => $fieldType === FieldType::TYPE_SECRET ? self::DEFAULT_VISIBLE : null,
-            self::FORMAT => $fieldType === FieldType::TYPE_TEXT ? self::FORMAT_PLAIN : null,
-            default => null,
-        };
+        return FieldTypes::for($fieldType)->defaultSetting($code);
     }
 
     /**
      * Value object class of a type with units, or null.
      *
-     * @return ?class-string<HasUnits>
+     * @return ?class-string<\Amarenkov\MutableContent\ValueObjects\HasUnits>
      */
     public static function getUnitClass(string $fieldType): ?string
     {
-        return match ($fieldType) {
-            FieldType::TYPE_WEIGHT => Weight::class,
-            FieldType::TYPE_LENGTH => Length::class,
-            FieldType::TYPE_AREA => Area::class,
-            FieldType::TYPE_VOLUME => Volume::class,
-            FieldType::TYPE_DURATION => Duration::class,
-            default => null,
-        };
+        return FieldTypes::for($fieldType)->unitClass();
+    }
+
+    /**
+     * Unit a value of a type with units is entered and shown in.
+     */
+    public static function displayUnit(Field $field): string
+    {
+        return static::getValue($field, self::DISPLAY_UNIT) ?? static::getUnitClass($field->fieldType)::baseUnit();
     }
 
     /**

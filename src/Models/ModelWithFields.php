@@ -21,10 +21,4 @@ class ModelWithFields extends Model implements MutableModel
     use SoftDeletes;
     use HasMutableFields;
     use HasChangeLog;
-
-    // static
-    /**
-     * @deprecated No longer used and no longer needs to be redeclared in subclasses.
-     */
-    protected static array|bool|null $fieldDefinitions = null;
 }

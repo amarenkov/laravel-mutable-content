@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Amarenkov\MutableContent\Contracts\MutableModel;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
+use Amarenkov\MutableContent\Domain\LovRegistry;
+use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Domain\MutableClassRegistry;
-
 
 /**
  * Objects referenced by object fields, by id or by code (TypeSettings::LINK_BY_CODE).
@@ -217,6 +219,37 @@ class ObjectHelper
         return $class::query()
             ->whereNotNull(self::codeColumn($class))
             ->select(self::codeColumn($class));
+    }
+
+    /**
+     * Those of the fields that may hold a code missing from their LOV or class.
+     *
+     * @param array<string, Field> $fields
+     * @return array<string, Field>
+     */
+    public static function fieldsWithUnlistedCodes(array $fields): array
+    {
+        return array_filter($fields, fn (Field $field) => in_array($field->fieldType, [FieldType::TYPE_LOV_ITEM, FieldType::TYPE_OBJECT], true) && TypeSettings::allowsUnlistedCodes($field));
+    }
+
+    /**
+     * Records with an unlisted code in any of the fields.
+     *
+     * @param array<string, Field> $fields
+     */
+    public static function whereHasUnlistedCode(Builder $query, array $fields): void
+    {
+        $lovRegistry = app(LovRegistry::class);
+
+        foreach ($fields as $field) {
+            $column = 'fields->'.$field->code;
+
+            $codes = $field->fieldType === FieldType::TYPE_OBJECT
+                ? self::codesQuery($field->objectClass)
+                : array_map('strval', array_keys($lovRegistry->getLovItemsOptions($field->lovCode)));
+
+            $query->orWhere(fn (Builder $query) => $query->whereNotNull($column)->whereNotIn($column, $codes));
+        }
     }
 
     // protected

@@ -7,7 +7,6 @@ use Attribute;
 use Amarenkov\MutableContent\Attributes\Field\Field as AttributeField;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
-use Amarenkov\MutableContent\Domain\Field\Usage;
 use Amarenkov\MutableContent\Domain\Field\Lov\Type;
 
 #[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]

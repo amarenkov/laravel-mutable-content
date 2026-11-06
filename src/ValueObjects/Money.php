@@ -48,6 +48,24 @@ final readonly class Money implements FieldValue, JsonSerializable, Stringable
     }
 
     /**
+     * Sum of the amounts of one currency; nulls are skipped, null when nothing is left.
+     *
+     * @param iterable<?self> $amounts
+     */
+    public static function sum(iterable $amounts): ?self
+    {
+        $result = null;
+
+        foreach ($amounts as $amount) {
+            if ($amount) {
+                $result = $result ? $result->add($amount) : $amount;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Value from a field: {"amount": ..., "currency": ...}; null for an empty or a malformed value.
      */
     public static function fromFieldValue(mixed $value): ?self

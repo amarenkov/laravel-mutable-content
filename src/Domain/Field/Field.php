@@ -2,7 +2,6 @@
 
 namespace Amarenkov\MutableContent\Domain\Field;
 
-use InvalidArgumentException;
 use LogicException;
 
 class Field

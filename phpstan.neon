@@ -3,6 +3,10 @@ includes:
     - vendor/larastan/larastan/extension.neon
 
 parameters:
+    ignoreErrors:
+        -
+            identifier: trait.unused
+            path: src/Models/Concerns/OwnedByUser.php
     level: 5
     paths:
         - src

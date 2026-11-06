@@ -10,7 +10,7 @@ use Amarenkov\MutableContent\Domain\LovRegistry;
  
 class InLov implements ValidationRule
 {
-    public function __construct(protected string $lovCode)
+    public function __construct(public readonly string $lovCode)
     {
     }
 

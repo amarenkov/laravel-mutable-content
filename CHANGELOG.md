@@ -7,6 +7,27 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `mergeWithFields()` normalizes values like `setField()`: a secret field is encrypted (it was stored as plain text).
+- `whereField()` compares a field of a type by its definition: a number field bound to a type compares as a number, not as text.
+- A class whose type field is an object reference runs one query per object for its type, not one on every attribute read; reading a field of a typed model no longer resolves the definitions several times.
+
+### Added
+
+- `Domain\Field\Types\FieldType` and `FieldTypes`: one class per field type decides how a value is stored, compared, validated and shown; `TypeSettings`, `RuleHelper`, `LogHelper` and `whereField()` go through them.
+- `Helpers\UserHelper`, `Models\Concerns\OwnedByUser`, `Money::sum()`, `TypeSettings::displayUnit()`, `ObjectHelper::fieldsWithUnlistedCodes()` and `whereHasUnlistedCode()`, `padHours` of `Duration::clock()`.
+
+### Changed
+
+- Change log descriptions show density and surface density with their units.
+- `Rules\InLov::$lovCode` is public and read-only.
+- Measurement value objects share their code through `ValueObjects\Concerns\IsMeasure` and `HasUnitScale`; their API is unchanged.
+
+### Removed
+
+- The deprecated `ModelWithFields::$fieldDefinitions` and the `Schema::upParseTimestamptz()` macro.
+
 ## [0.8.0] - 2026-11-04
 
 ### Added

@@ -4,15 +4,9 @@ namespace Amarenkov\MutableContent\Helpers;
 
 use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
 use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\Field\Types\FieldTypes;
 
-use Amarenkov\MutableContent\Rules\InLovs as RuleInLovs;
-use Amarenkov\MutableContent\Rules\InLov as RuleInLov;
-use Amarenkov\MutableContent\Rules\LovItemCode as RuleLovItemCode;
-use Amarenkov\MutableContent\Rules\Money as RuleMoney;
 use Amarenkov\MutableContent\Rules\NotZero as RuleNotZero;
-use Amarenkov\MutableContent\Rules\ObjectCode as RuleObjectCode;
-use Amarenkov\MutableContent\Rules\ObjectCodeExists as RuleObjectCodeExists;
-use Amarenkov\MutableContent\Rules\ObjectExists as RuleObjectExists;
 
 class RuleHelper
 {
@@ -49,106 +43,13 @@ class RuleHelper
         $maxLengths = $class::getFieldMaxLengths();
 
         foreach ($fields as $field) {
-            $rules = [];
-
             $usage = $field->usage();
 
             if ($usage->isImmutable || $field->fieldType === FieldType::TYPE_SYSTEM) {
                 continue;
             }
 
-            switch ($field->fieldType) {
-                case FieldType::TYPE_BOOL:
-                    $rules[] = 'boolean';
-                    break;
-
-                case FieldType::TYPE_FLOAT:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_INT:
-                    $rules[] = 'integer';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_MONEY:
-                    $rules[] = RuleMoney::forField($field);
-                    break;
-
-                case FieldType::TYPE_WEIGHT:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_DENSITY:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_SURFACE_DENSITY:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_LENGTH:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_AREA:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_VOLUME:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_DURATION:
-                    $rules[] = 'numeric';
-                    array_push($rules, ...static::getSignRules($field));
-                    break;
-
-                case FieldType::TYPE_DATETIME:
-                    $rules[] = 'date';
-                    break;
-
-                case FieldType::TYPE_DATE:
-                    $rules[] = 'date_format:Y-m-d';
-                    break;
-
-                case FieldType::TYPE_ICON:
-                    $rules[] = 'string';
-                    $rules[] = 'max:255';
-                    break;
-
-                case FieldType::TYPE_LOV:
-                    $rules[] = new RuleInLovs();
-                    break;
-
-                case FieldType::TYPE_LOV_ITEM:
-                    $rules[] = TypeSettings::allowsUnlistedCodes($field) ? new RuleLovItemCode($field->lovCode) : new RuleInLov($field->lovCode);
-                    break;
-
-                case FieldType::TYPE_OBJECT:
-                    if (TypeSettings::linksByCode($field)) {
-                        $rules[] = TypeSettings::allowsUnlistedCodes($field) ? new RuleObjectCode($field->objectClass) : new RuleObjectCodeExists($field->objectClass);
-                        break;
-                    }
-
-                    $rules[] = 'integer';
-
-                    if ($field->objectClass) {
-                        $rules[] = new RuleObjectExists($field->objectClass);
-                    }
-                    break;
-
-                default:
-                    $rules[] = 'string';
-                    break;
-            }
+            $rules = FieldTypes::for($field->fieldType)->rules($field);
 
             if (isset($maxLengths[$field->code])) {
                 $rules[] = 'max:'.$maxLengths[$field->code];

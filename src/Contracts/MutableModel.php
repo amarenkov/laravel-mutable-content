@@ -58,6 +58,10 @@ interface MutableModel
      */
     public static function getFieldMaxLengths(): array;
 
+    public static function toDateTimeValue(mixed $value): mixed;
+
+    public static function toMoneyValue(mixed $value): mixed;
+
     public static function getSystemFields();
 
     /**

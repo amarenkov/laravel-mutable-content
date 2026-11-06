@@ -2,18 +2,21 @@
 
 namespace Amarenkov\MutableContent\ValueObjects;
 
-use InvalidArgumentException;
 use JsonSerializable;
 use Stringable;
 
-use Amarenkov\MutableContent\Helpers\NumberHelper;
+use Amarenkov\MutableContent\ValueObjects\Concerns\HasUnitScale;
 
 /**
  * Weight in kilograms.
  */
 final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, Stringable
 {
+    use HasUnitScale;
+
     // const
+    protected const NAME = 'Weight';
+
     public const GRAMS_IN_KILOGRAM = 1000;
     public const KILOGRAMS_IN_TONNE = 1000;
 
@@ -25,7 +28,11 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
 
     public const UNITS = [self::UNIT_GRAM, self::UNIT_KILOGRAM, self::UNIT_TONNE];
 
-    protected const UNIT_KILOGRAMS = [
+    protected const BASE_UNIT = self::UNIT_KILOGRAM;
+
+    protected const DEFAULT_FORMAT_UNIT = self::UNIT_KILOGRAM;
+
+    protected const UNIT_FACTORS = [
         self::UNIT_GRAM => 1 / self::GRAMS_IN_KILOGRAM,
         self::UNIT_KILOGRAM => 1,
         self::UNIT_TONNE => self::KILOGRAMS_IN_TONNE,
@@ -46,15 +53,7 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
     // static
     public static function fromKilograms(float|int|string $kilograms): self
     {
-        if (is_string($kilograms)) {
-            if (!is_numeric($kilograms)) {
-                throw new InvalidArgumentException('Weight must be numeric, "'.$kilograms.'" given');
-            }
-
-            $kilograms = (float)$kilograms;
-        }
-
-        return new self((float)$kilograms);
+        return self::fromBaseValue($kilograms);
     }
 
     public static function fromGrams(float|int $grams): self
@@ -67,99 +66,17 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
         return new self($tonnes * self::KILOGRAMS_IN_TONNE);
     }
 
-    public static function fromUnit(float|int|string $value, string $unit): self
+    // protected
+    protected function baseValue(): float
     {
-        if (is_string($value)) {
-            if (!is_numeric($value)) {
-                throw new InvalidArgumentException('Weight must be numeric, "'.$value.'" given');
-            }
-
-            $value = (float)$value;
-        }
-
-        return new self(round($value * self::unitKilograms($unit), self::UNIT_PRECISION[self::UNIT_KILOGRAM]));
-    }
-
-    public static function zero(): self
-    {
-        return new self(0.0);
-    }
-
-    /**
-     * From a field value: null for null or an empty string, otherwise as fromKilograms().
-     */
-    public static function fromFieldValue(mixed $value): ?self
-    {
-        if ($value instanceof self) {
-            return $value;
-        }
-
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_int($value) && !is_float($value) && !is_string($value)) {
-            throw new InvalidArgumentException('Weight must be numeric, '.get_debug_type($value).' given');
-        }
-
-        return self::fromKilograms($value);
-    }
-
-    /**
-     * @param iterable<self> $weights
-     */
-    public static function sum(iterable $weights): self
-    {
-        $kilograms = 0.0;
-
-        foreach ($weights as $weight) {
-            $kilograms += $weight->kilograms;
-        }
-
-        return new self($kilograms);
-    }
-
-    public static function units(): array
-    {
-        return self::UNITS;
-    }
-
-    public static function baseUnit(): string
-    {
-        return self::UNIT_KILOGRAM;
-    }
-
-    public static function unitLabel(string $unit): string
-    {
-        self::unitKilograms($unit);
-
-        return __('mutable-content::units.'.$unit);
-    }
-
-    /**
-     * @return array<string, string> unit => label
-     */
-    public static function unitOptions(): array
-    {
-        return array_combine(self::UNITS, array_map(fn ($unit) => self::unitLabel($unit), self::UNITS));
-    }
-
-    protected static function unitKilograms(string $unit): float|int
-    {
-        if (!isset(self::UNIT_KILOGRAMS[$unit])) {
-            throw new InvalidArgumentException('Unknown weight unit "'.$unit.'"');
-        }
-
-        return self::UNIT_KILOGRAMS[$unit];
+        return $this->kilograms;
     }
 
     // public
     public function __construct(
         public float $kilograms
     ) {
-        if (!is_finite($kilograms)) {
-            throw new InvalidArgumentException('Weight must be a finite number');
-        }
+        self::assertFinite($kilograms);
     }
 
     public function toKilograms(): float
@@ -177,106 +94,4 @@ final readonly class Weight implements FieldValue, HasUnits, JsonSerializable, S
         return $this->kilograms / self::KILOGRAMS_IN_TONNE;
     }
 
-    public function toUnit(string $unit): float
-    {
-        return round($this->kilograms / self::unitKilograms($unit), self::UNIT_PRECISION[$unit]);
-    }
-
-    public function add(self $other): self
-    {
-        return new self($this->kilograms + $other->kilograms);
-    }
-
-    public function subtract(self $other): self
-    {
-        $kilograms = $this->kilograms - $other->kilograms;
-
-        if (abs($kilograms) < self::EPSILON) {
-            $kilograms = 0.0;
-        }
-
-        return new self($kilograms);
-    }
-
-    public function multiply(float|int $factor): self
-    {
-        return new self($this->kilograms * $factor);
-    }
-
-    public function divide(float|int $divisor): self
-    {
-        if ($divisor == 0) {
-            throw new InvalidArgumentException('Weight cannot be divided by zero');
-        }
-
-        return new self($this->kilograms / $divisor);
-    }
-
-    public function compareTo(self $other): int
-    {
-        if ($this->equals($other)) {
-            return 0;
-        }
-
-        return $this->kilograms <=> $other->kilograms;
-    }
-
-    public function equals(self $other): bool
-    {
-        return abs($this->kilograms - $other->kilograms) < self::EPSILON;
-    }
-
-    public function isGreaterThan(self $other): bool
-    {
-        return $this->compareTo($other) > 0;
-    }
-
-    public function isLessThan(self $other): bool
-    {
-        return $this->compareTo($other) < 0;
-    }
-
-    public function isZero(): bool
-    {
-        return abs($this->kilograms) < self::EPSILON;
-    }
-
-    public function isNegative(): bool
-    {
-        return $this->kilograms <= -self::EPSILON;
-    }
-
-    public function abs(): self
-    {
-        return new self(abs($this->kilograms));
-    }
-
-    /**
-     * Format to the gram without trailing zeros.
-     */
-    public function format(?int $decimals = null, ?string $decimalSeparator = null, ?string $thousandsSeparator = null, ?string $unit = null): string
-    {
-        $unit ??= self::UNIT_KILOGRAM;
-        $value = $this->toUnit($unit);
-        $decimals ??= self::UNIT_FORMAT_DECIMALS[$unit];
-
-        $formatted = NumberHelper::format($value, $decimals, $decimalSeparator, $thousandsSeparator);
-
-        return $formatted.' '.self::unitLabel($unit);
-    }
-
-    public function toFieldValue(): float
-    {
-        return $this->kilograms;
-    }
-
-    public function jsonSerialize(): float
-    {
-        return $this->kilograms;
-    }
-
-    public function __toString(): string
-    {
-        return $this->format();
-    }
 }

@@ -7,13 +7,18 @@ use JsonSerializable;
 use Stringable;
 
 use Amarenkov\MutableContent\Helpers\NumberHelper;
+use Amarenkov\MutableContent\ValueObjects\Concerns\IsMeasure;
 
 /**
  * Surface density in kg/m². Zero and negative values are allowed by the allow_zero and allow_negative type settings.
  */
 final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Stringable
 {
+    use IsMeasure;
+
     // const
+    protected const NAME = 'Surface density';
+
     public const G_PER_M2_IN_KG_PER_M2 = 1000;
 
     public const EPSILON = 0.000001;
@@ -21,15 +26,7 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
     // static
     public static function fromKilogramsPerSquareMeter(float|int|string $kilogramsPerSquareMeter): self
     {
-        if (is_string($kilogramsPerSquareMeter)) {
-            if (!is_numeric($kilogramsPerSquareMeter)) {
-                throw new InvalidArgumentException('Surface density must be numeric, "'.$kilogramsPerSquareMeter.'" given');
-            }
-
-            $kilogramsPerSquareMeter = (float)$kilogramsPerSquareMeter;
-        }
-
-        return new self((float)$kilogramsPerSquareMeter);
+        return self::fromBaseValue($kilogramsPerSquareMeter);
     }
 
     public static function fromGramsPerSquareMeter(float|int $gramsPerSquareMeter): self
@@ -51,33 +48,17 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
         return new self($density->kilogramsPerCubicMeter * $thickness->meters);
     }
 
-    /**
-     * From a field value: null for null or an empty string, otherwise as fromKilogramsPerSquareMeter().
-     */
-    public static function fromFieldValue(mixed $value): ?self
+    // protected
+    protected function baseValue(): float
     {
-        if ($value instanceof self) {
-            return $value;
-        }
-
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_int($value) && !is_float($value) && !is_string($value)) {
-            throw new InvalidArgumentException('Surface density must be numeric, '.get_debug_type($value).' given');
-        }
-
-        return self::fromKilogramsPerSquareMeter($value);
+        return $this->kilogramsPerSquareMeter;
     }
 
     // public
     public function __construct(
         public float $kilogramsPerSquareMeter
     ) {
-        if (!is_finite($kilogramsPerSquareMeter)) {
-            throw new InvalidArgumentException('Surface density must be a finite number');
-        }
+        self::assertFinite($kilogramsPerSquareMeter);
     }
 
     public function toKilogramsPerSquareMeter(): float
@@ -113,59 +94,6 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
         return new Length($this->kilogramsPerSquareMeter / $density->kilogramsPerCubicMeter);
     }
 
-    public function multiply(float|int $factor): self
-    {
-        return new self($this->kilogramsPerSquareMeter * $factor);
-    }
-
-    public function divide(float|int $divisor): self
-    {
-        if ($divisor == 0) {
-            throw new InvalidArgumentException('Surface density cannot be divided by zero');
-        }
-
-        return new self($this->kilogramsPerSquareMeter / $divisor);
-    }
-
-    public function compareTo(self $other): int
-    {
-        if ($this->equals($other)) {
-            return 0;
-        }
-
-        return $this->kilogramsPerSquareMeter <=> $other->kilogramsPerSquareMeter;
-    }
-
-    public function equals(self $other): bool
-    {
-        return abs($this->kilogramsPerSquareMeter - $other->kilogramsPerSquareMeter) < self::EPSILON;
-    }
-
-    public function isGreaterThan(self $other): bool
-    {
-        return $this->compareTo($other) > 0;
-    }
-
-    public function isLessThan(self $other): bool
-    {
-        return $this->compareTo($other) < 0;
-    }
-
-    public function isZero(): bool
-    {
-        return abs($this->kilogramsPerSquareMeter) < self::EPSILON;
-    }
-
-    public function isNegative(): bool
-    {
-        return $this->kilogramsPerSquareMeter <= -self::EPSILON;
-    }
-
-    public function abs(): self
-    {
-        return new self(abs($this->kilogramsPerSquareMeter));
-    }
-
     /**
      * Format in kg/m² without trailing zeros.
      */
@@ -176,18 +104,4 @@ final readonly class SurfaceDensity implements FieldValue, JsonSerializable, Str
         return $formatted.' '.__('mutable-content::units.kg_per_m2');
     }
 
-    public function toFieldValue(): float
-    {
-        return $this->kilogramsPerSquareMeter;
-    }
-
-    public function jsonSerialize(): float
-    {
-        return $this->kilogramsPerSquareMeter;
-    }
-
-    public function __toString(): string
-    {
-        return $this->format();
-    }
 }

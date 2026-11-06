@@ -26,6 +26,15 @@ class SecretFieldTest extends FeatureTestCase
         return $record;
     }
 
+    public function test_merged_value_is_stored_encrypted(): void
+    {
+        $record = new Record();
+        $record->mergeWithFields([Record::FIELD_TOKEN => 'sk-1']);
+
+        $this->assertNotSame('sk-1', $record->getField(Record::FIELD_TOKEN));
+        $this->assertSame('sk-1', $record->getSecret(Record::FIELD_TOKEN));
+    }
+
     public function test_value_is_stored_encrypted_and_read_decrypted(): void
     {
         $record = $this->makeRecord([Record::FIELD_TOKEN => 'sk-123']);
@@ -56,7 +65,7 @@ class SecretFieldTest extends FeatureTestCase
     public function test_value_not_encrypted_with_the_application_key_reads_as_null(): void
     {
         $record = $this->makeRecord();
-        $record->mergeWithFields([Record::FIELD_TOKEN => 'plain']);
+        $record->setRawAttributes(['fields' => json_encode([Record::FIELD_TOKEN => 'plain'])] + $record->getAttributes());
 
         $this->assertNull($record->getSecret(Record::FIELD_TOKEN));
     }
@@ -82,7 +91,7 @@ class SecretFieldTest extends FeatureTestCase
         );
         $this->assertSame(range(0, TypeSettings::MAX_VISIBLE), TypeSettings::getAllowedValues(Type::TYPE_SECRET)[TypeSettings::VISIBLE_START]);
 
-        $record->mergeWithFields([Record::FIELD_TOKEN => 'not encrypted']);
+        $record->setRawAttributes(['fields' => json_encode([Record::FIELD_TOKEN => 'not encrypted'])] + $record->getAttributes());
 
         $this->assertSame(SecretHelper::MASK, $record->maskedSecret(Record::FIELD_TOKEN));
     }

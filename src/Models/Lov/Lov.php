@@ -8,14 +8,12 @@ use ReflectionClass;
 
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 use Amarenkov\MutableContent\Domain\Field\Field as DomainField;
 use Amarenkov\MutableContent\Domain\Lov\Lov as DomainLov;
-use Amarenkov\MutableContent\Domain\Field\Lov\Type as DomainLovFieldType;
 
 use Amarenkov\MutableContent\Domain\LovRegistry;
 

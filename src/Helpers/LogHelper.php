@@ -3,7 +3,6 @@
 namespace Amarenkov\MutableContent\Helpers;
 
 use DateTimeInterface;
-use InvalidArgumentException;
 
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Casts\Json;
@@ -15,15 +14,11 @@ use Illuminate\Support\Facades\Log;
 use Amarenkov\MutableContent\Contracts\MutableModel;
 
 use Amarenkov\MutableContent\Domain\Field\Field;
-use Amarenkov\MutableContent\Domain\Field\Lov\Type as FieldType;
-use Amarenkov\MutableContent\Domain\Field\TypeSettings;
+use Amarenkov\MutableContent\Domain\Field\Types\FieldTypes;
 use Amarenkov\MutableContent\Domain\Log\Changes;
 use Amarenkov\MutableContent\Domain\Log\LogData;
-use Amarenkov\MutableContent\Domain\LovRegistry;
 
 use Amarenkov\MutableContent\Macros\Database\Schema\Builder as SchemaBuilder;
-
-use Amarenkov\MutableContent\ValueObjects\Money;
 
 /**
  * Reads the change log written by the triggers of Schema::addLog() and Schema::createWithLog().
@@ -259,56 +254,18 @@ class LogHelper
      */
     public static function formatValue(?Field $field, mixed $value): ?string
     {
+        if ($field) {
+            return FieldTypes::display($field, $value);
+        }
+
         if ($value === null || $value === '' || $value === []) {
             return null;
         }
 
-        if ($field?->fieldType === FieldType::TYPE_SECRET) {
-            return SecretHelper::maskStored($field, $value);
+        if (is_bool($value)) {
+            return $value ? __('mutable-content::log.yes') : __('mutable-content::log.no');
         }
 
-        if ($field?->fieldType === FieldType::TYPE_MONEY && ($money = Money::fromFieldValue($value))) {
-            return $money->format(TypeSettings::decimals($field));
-        }
-
-        if (is_array($value)) {
-            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }
-
-        if ($field === null) {
-            return is_bool($value) ? ($value ? __('mutable-content::log.yes') : __('mutable-content::log.no')) : (string)$value;
-        }
-
-        switch ($field->fieldType) {
-            case FieldType::TYPE_BOOL:
-                return $value ? __('mutable-content::log.yes') : __('mutable-content::log.no');
-
-            case FieldType::TYPE_LOV_ITEM:
-                return app(LovRegistry::class)->getLovItemLabel($field->lovCode, $value) ?? (string)$value;
-
-            case FieldType::TYPE_LOV:
-                return app(LovRegistry::class)->getLovLabel($value) ?? (string)$value;
-
-            case FieldType::TYPE_OBJECT:
-                if (!$field->objectClass) {
-                    return (string)$value;
-                }
-
-                $title = TypeSettings::linksByCode($field)
-                    ? ObjectHelper::getTitleByCode($field->objectClass, $value)
-                    : ObjectHelper::getTitleById($field->objectClass, $value);
-
-                return $title ?? (string)$value;
-        }
-
-        if ($unitClass = TypeSettings::getUnitClass($field->fieldType)) {
-            try {
-                return $unitClass::fromFieldValue($value)?->format(unit: TypeSettings::getValue($field, TypeSettings::DISPLAY_UNIT)) ?? (string)$value;
-            } catch (InvalidArgumentException) {
-                return (string)$value;
-            }
-        }
-
-        return (string)$value;
+        return is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : (string)$value;
     }
 }

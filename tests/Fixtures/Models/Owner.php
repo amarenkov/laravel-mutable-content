@@ -27,8 +27,6 @@ class Owner extends ModelWithFields
     public const FIELD_IS_ACTIVE = 'is_active';
 
     // static
-    protected static array|bool|null $fieldDefinitions = null;
-
     public static function uniqueFieldSets(): array
     {
         return [['code']];

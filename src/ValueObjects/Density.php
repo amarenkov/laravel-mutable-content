@@ -7,13 +7,18 @@ use JsonSerializable;
 use Stringable;
 
 use Amarenkov\MutableContent\Helpers\NumberHelper;
+use Amarenkov\MutableContent\ValueObjects\Concerns\IsMeasure;
 
 /**
  * Density in kg/m³. Zero and negative values are allowed by the allow_zero and allow_negative type settings.
  */
 final readonly class Density implements FieldValue, JsonSerializable, Stringable
 {
+    use IsMeasure;
+
     // const
+    protected const NAME = 'Density';
+
     public const KG_PER_M3_IN_G_PER_CM3 = 1000;
     public const KG_PER_M3_IN_KG_PER_L = 1000;
     public const KG_PER_M3_IN_T_PER_M3 = 1000;
@@ -23,15 +28,7 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
     // static
     public static function fromKilogramsPerCubicMeter(float|int|string $kilogramsPerCubicMeter): self
     {
-        if (is_string($kilogramsPerCubicMeter)) {
-            if (!is_numeric($kilogramsPerCubicMeter)) {
-                throw new InvalidArgumentException('Density must be numeric, "'.$kilogramsPerCubicMeter.'" given');
-            }
-
-            $kilogramsPerCubicMeter = (float)$kilogramsPerCubicMeter;
-        }
-
-        return new self((float)$kilogramsPerCubicMeter);
+        return self::fromBaseValue($kilogramsPerCubicMeter);
     }
 
     public static function fromGramsPerCubicCentimeter(float|int $gramsPerCubicCentimeter): self
@@ -58,33 +55,17 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
         return new self($weight->kilograms / $cubicMeters);
     }
 
-    /**
-     * From a field value: null for null or an empty string, otherwise as fromKilogramsPerCubicMeter().
-     */
-    public static function fromFieldValue(mixed $value): ?self
+    // protected
+    protected function baseValue(): float
     {
-        if ($value instanceof self) {
-            return $value;
-        }
-
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_int($value) && !is_float($value) && !is_string($value)) {
-            throw new InvalidArgumentException('Density must be numeric, '.get_debug_type($value).' given');
-        }
-
-        return self::fromKilogramsPerCubicMeter($value);
+        return $this->kilogramsPerCubicMeter;
     }
 
     // public
     public function __construct(
         public float $kilogramsPerCubicMeter
     ) {
-        if (!is_finite($kilogramsPerCubicMeter)) {
-            throw new InvalidArgumentException('Density must be a finite number');
-        }
+        self::assertFinite($kilogramsPerCubicMeter);
     }
 
     public function toKilogramsPerCubicMeter(): float
@@ -121,59 +102,6 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
         return $weight->kilograms / $this->kilogramsPerCubicMeter;
     }
 
-    public function multiply(float|int $factor): self
-    {
-        return new self($this->kilogramsPerCubicMeter * $factor);
-    }
-
-    public function divide(float|int $divisor): self
-    {
-        if ($divisor == 0) {
-            throw new InvalidArgumentException('Density cannot be divided by zero');
-        }
-
-        return new self($this->kilogramsPerCubicMeter / $divisor);
-    }
-
-    public function compareTo(self $other): int
-    {
-        if ($this->equals($other)) {
-            return 0;
-        }
-
-        return $this->kilogramsPerCubicMeter <=> $other->kilogramsPerCubicMeter;
-    }
-
-    public function equals(self $other): bool
-    {
-        return abs($this->kilogramsPerCubicMeter - $other->kilogramsPerCubicMeter) < self::EPSILON;
-    }
-
-    public function isGreaterThan(self $other): bool
-    {
-        return $this->compareTo($other) > 0;
-    }
-
-    public function isLessThan(self $other): bool
-    {
-        return $this->compareTo($other) < 0;
-    }
-
-    public function isZero(): bool
-    {
-        return abs($this->kilogramsPerCubicMeter) < self::EPSILON;
-    }
-
-    public function isNegative(): bool
-    {
-        return $this->kilogramsPerCubicMeter <= -self::EPSILON;
-    }
-
-    public function abs(): self
-    {
-        return new self(abs($this->kilogramsPerCubicMeter));
-    }
-
     /**
      * Format in kg/m³ without trailing zeros.
      */
@@ -184,18 +112,4 @@ final readonly class Density implements FieldValue, JsonSerializable, Stringable
         return $formatted.' '.__('mutable-content::units.kg_per_m3');
     }
 
-    public function toFieldValue(): float
-    {
-        return $this->kilogramsPerCubicMeter;
-    }
-
-    public function jsonSerialize(): float
-    {
-        return $this->kilogramsPerCubicMeter;
-    }
-
-    public function __toString(): string
-    {
-        return $this->format();
-    }
 }

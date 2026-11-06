@@ -4,6 +4,8 @@ namespace Amarenkov\MutableContent\Tests\Feature\Fields;
 
 use InvalidArgumentException;
 
+use Illuminate\Support\Facades\DB;
+
 use Amarenkov\MutableContent\Domain\Field\Lov\Type;
 use Amarenkov\MutableContent\Models\Field\Field;
 use Amarenkov\MutableContent\Models\Field\Usage;
@@ -107,6 +109,53 @@ class ClassTypesTest extends FeatureTestCase
 
         $this->assertSame('acme', $ticket->typeCode());
         $this->assertSame('C-1', $ticket->fresh()->contract);
+    }
+
+    public function test_object_type_takes_one_query_per_object(): void
+    {
+        $owner = new Owner();
+        $owner->fill(['code' => 'acme', 'label' => 'Acme']);
+        $owner->save();
+
+        $ticket = new OwnedTicket();
+        $ticket->fill(['label' => 'Ticket', OwnedTicket::FIELD_OWNER_ID => $owner->id]);
+        $ticket->save();
+
+        $ticket = OwnedTicket::query()->findOrFail($ticket->id);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        foreach (range(1, 10) as $read) {
+            $ticket->created_at;
+        }
+
+        $finds = array_filter(DB::getQueryLog(), fn (array $query) => str_contains($query['query'], (new Owner())->getTable()));
+
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $finds);
+    }
+
+    public function test_where_field_compares_a_number_field_of_a_type_as_a_number(): void
+    {
+        $this->bind($this->makeField('severity', Type::TYPE_INT), Ticket::class, TicketKind::BUG);
+
+        $low = $this->makeTicket(TicketKind::BUG, ['severity' => 9]);
+        $high = $this->makeTicket(TicketKind::BUG, ['severity' => 10]);
+
+        $this->assertSame([$high->id], Ticket::query()->whereField('severity', '>', 9)->pluck('id')->all());
+        $this->assertSame([$low->id], Ticket::query()->whereField('severity', '<', 10)->pluck('id')->all());
+    }
+
+    public function test_merged_fields_of_a_type_are_normalized_by_its_definitions(): void
+    {
+        $this->bind($this->makeField('severity', Type::TYPE_INT), Ticket::class, TicketKind::BUG);
+
+        $ticket = new Ticket();
+        $ticket->mergeWithFields(['severity' => '5', Ticket::FIELD_KIND => TicketKind::BUG]);
+
+        $this->assertSame(5, $ticket->getField('severity'));
     }
 
     public function test_lov_items_take_fields_by_their_lov(): void

@@ -11,11 +11,6 @@ use Illuminate\Database\Eloquent\Casts\ArrayObject;
  */
 class ReadOnlyArrayObject extends ArrayObject
 {
-    public function offsetGet(mixed $key): mixed
-    {
-        return parent::offsetGet($key);
-    }
-
     public function offsetSet(mixed $key, mixed $value): void
     {
         $this->denyWrite();

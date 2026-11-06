@@ -4,7 +4,6 @@ namespace Amarenkov\MutableContent\Models\Field;
 
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 use InvalidArgumentException;
 use LogicException;
