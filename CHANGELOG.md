@@ -7,6 +7,10 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Reading a field of an object loaded without the `fields` column gives the value of the selected generated column instead of a silent `null`.
+
 ## [0.9.0] - 2026-11-06
 
 ### Fixed

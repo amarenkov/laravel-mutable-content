@@ -162,6 +162,18 @@ class ModelWithFieldsTest extends FeatureTestCase
         $this->assertSameFields(['code' => 'REC-6', 'legacy' => 'keep', 'quantity' => 1], $this->storedFields($record));
     }
 
+    public function test_field_is_read_from_its_column_when_fields_are_not_loaded(): void
+    {
+        $record = new Record();
+        $record->fill(['code' => 'REC-COLUMN', Record::FIELD_QUANTITY => 3]);
+        $record->save();
+
+        $partial = Record::select('id', 'code')->find($record->id);
+
+        $this->assertSame('REC-COLUMN', $partial->code);
+        $this->assertNull($partial->{Record::FIELD_QUANTITY});
+    }
+
     public function test_fields_cannot_be_changed_when_not_loaded(): void
     {
         $record = $this->recordWithUndeclaredField();

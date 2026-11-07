@@ -950,8 +950,9 @@ trait HasMutableFields
             return $this->getFieldByPath(substr($key, strlen(self::FIELDS_PATH_PREFIX)));
         }
 
-        if ($this->isItField($key))
+        if ($this->isItField($key) && (array_key_exists(self::FIELDS_COLUMN, $this->attributes) || !array_key_exists($key, $this->attributes))) {
             return $this->getField($key);
+        }
 
         return parent::getAttribute($key);
     }
